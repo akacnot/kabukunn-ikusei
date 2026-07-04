@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>かぶくん育成ゲーム</title>
+</head>
+<body>
+
+<h1>かぶくん育成ゲーム</h1>
+
+<p>レベル: <span id="lv">1</span></p>
+
+<button onclick="feed()">ごはん</button>
+
+<script>
+let lv = 1;
+
+function feed() {
+  lv++;
+  document.getElementById("lv").innerText = lv;
+}
+</script>
+
+</body>
+</html>
