@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" role="img" aria-label="コイン">
+  <circle cx="40" cy="40" r="34" fill="#f7b934"/>
+  <circle cx="40" cy="40" r="27" fill="#ffd86a"/>
+  <path d="M40 20v40M29 29c4-5 18-5 22 2 3 6-2 11-11 11s-14 4-11 10c4 8 19 7 23 0" fill="none" stroke="#ad6a13" stroke-width="7" stroke-linecap="round"/>
+</svg>
