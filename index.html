@@ -12,7 +12,7 @@
         <section id="titleScreen" class="screen screen-title is-active">
           <div class="title-cloud cloud-a"></div>
           <div class="title-cloud cloud-b"></div>
-          <img class="hero-kabu" src="./assets/images/kabukun-placeholder.svg" alt="かぶくん" />
+          <img id="titleKabuImage" class="hero-kabu" src="./assets/images/kabukun-placeholder.svg" alt="かぶくん" />
           <p class="title-kicker">LINE LIFF 育成ゲーム</p>
           <h1>かぶくん</h1>
           <p class="title-copy">ごはんをあげて、ミッションをこなして、かわいい毎日を育てよう。</p>
@@ -34,12 +34,12 @@
               <p>ショップでえさを買い、ゲーム画面でごはんをあげると、かぶくんがよろこびます。</p>
             </article>
             <article class="info-panel">
-              <h3>コインとミッション</h3>
-              <p>ログインやお世話でミッションが進みます。達成したら報酬を受け取りましょう。</p>
+              <h3>ミニゲーム</h3>
+              <p>「かぶキャッチ」で落ちてくるコインを集めると、結果に応じてコインを獲得できます。</p>
             </article>
             <article class="info-panel">
-              <h3>ギフトコード</h3>
-              <p>ショップ内のギフトコード画面でコードを入力すると、コインやアイテムを受け取れます。</p>
+              <h3>写真の差し替え</h3>
+              <p>「写真をえらぶ」から、自分で作った画像をかぶくんとして表示できます。</p>
             </article>
           </div>
         </section>
@@ -47,12 +47,15 @@
         <section id="gameScreen" class="screen screen-game">
           <header class="hud">
             <button class="icon-btn glass" data-route="title" aria-label="タイトルへ戻る">🏠</button>
-            <div class="coin-pill" aria-label="現在のコイン枚数">🪙 <span id="coinCount">0</span></div>
+            <div class="coin-pill" aria-label="現在のコイン枚数">
+              <img class="coin-icon" data-ui-image="coinIcon" alt="" />
+              <span id="coinCount">0</span>
+            </div>
           </header>
 
           <div class="playfield">
             <div class="sun"></div>
-            <img class="room-bg" src="./assets/images/room-placeholder.svg" alt="" />
+            <img id="roomImage" class="room-bg" src="./assets/images/room-placeholder.svg" alt="" />
             <button id="kabukunButton" class="kabukun-stage" aria-label="かぶくんにごはんをあげる">
               <img id="kabukunImage" src="./assets/images/kabukun-placeholder.svg" alt="かぶくん" />
               <span id="moodBubble" class="mood-bubble">おなかすいた</span>
@@ -69,11 +72,19 @@
               <strong><span id="foodCount">0</span>こ</strong>
             </div>
             <button id="feedButton" class="feed-btn">ごはんをあげる</button>
+            <button id="minigameButton" class="minigame-btn">かぶキャッチで稼ぐ</button>
+            <button id="earnButton" class="earn-btn">おてつだいでコインをもらう</button>
+            <button id="photoButton" class="photo-btn">写真をえらぶ</button>
+            <input id="photoInput" class="visually-hidden" type="file" accept="image/*" />
           </section>
 
           <nav class="bottom-nav" aria-label="メニュー">
-            <button class="nav-btn" data-modal="shop">🛒<span>ショップ</span></button>
-            <button class="nav-btn" data-modal="missions">🎯<span>ミッション</span></button>
+            <button class="nav-btn image-only" data-modal="shop" aria-label="ショップ">
+              <img data-ui-image="shopIcon" alt="" />
+            </button>
+            <button class="nav-btn image-only" data-modal="missions" aria-label="ミッション">
+              <img data-ui-image="missionIcon" alt="" />
+            </button>
           </nav>
         </section>
       </main>
