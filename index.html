@@ -1,25 +1,98 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>かぶくん育成ゲーム</title>
-</head>
-<body>
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>かぶくん育成ゲーム</title>
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <main class="phone-frame" aria-live="polite">
+        <section id="titleScreen" class="screen screen-title is-active">
+          <div class="title-cloud cloud-a"></div>
+          <div class="title-cloud cloud-b"></div>
+          <img class="hero-kabu" src="./assets/images/kabukun-placeholder.svg" alt="かぶくん" />
+          <p class="title-kicker">LINE LIFF 育成ゲーム</p>
+          <h1>かぶくん</h1>
+          <p class="title-copy">ごはんをあげて、ミッションをこなして、かわいい毎日を育てよう。</p>
+          <div class="title-actions">
+            <button class="primary-btn" data-route="game">はじめる</button>
+            <button class="secondary-btn" data-route="howto">遊び方</button>
+            <button class="ghost-btn" data-action="show-preparing">利用規約・プライバシーポリシー</button>
+          </div>
+        </section>
 
-<h1>かぶくん育成ゲーム</h1>
+        <section id="howtoScreen" class="screen">
+          <header class="simple-header">
+            <button class="icon-btn" data-route="title" aria-label="タイトルへ戻る">🏠</button>
+            <h2>遊び方</h2>
+          </header>
+          <div class="content-stack">
+            <article class="info-panel">
+              <h3>かぶくんのお世話</h3>
+              <p>ショップでえさを買い、ゲーム画面でごはんをあげると、かぶくんがよろこびます。</p>
+            </article>
+            <article class="info-panel">
+              <h3>コインとミッション</h3>
+              <p>ログインやお世話でミッションが進みます。達成したら報酬を受け取りましょう。</p>
+            </article>
+            <article class="info-panel">
+              <h3>ギフトコード</h3>
+              <p>ショップ内のギフトコード画面でコードを入力すると、コインやアイテムを受け取れます。</p>
+            </article>
+          </div>
+        </section>
 
-<p>レベル: <span id="lv">1</span></p>
+        <section id="gameScreen" class="screen screen-game">
+          <header class="hud">
+            <button class="icon-btn glass" data-route="title" aria-label="タイトルへ戻る">🏠</button>
+            <div class="coin-pill" aria-label="現在のコイン枚数">🪙 <span id="coinCount">0</span></div>
+          </header>
 
-<button onclick="feed()">ごはん</button>
+          <div class="playfield">
+            <div class="sun"></div>
+            <img class="room-bg" src="./assets/images/room-placeholder.svg" alt="" />
+            <button id="kabukunButton" class="kabukun-stage" aria-label="かぶくんにごはんをあげる">
+              <img id="kabukunImage" src="./assets/images/kabukun-placeholder.svg" alt="かぶくん" />
+              <span id="moodBubble" class="mood-bubble">おなかすいた</span>
+            </button>
+          </div>
 
-<script>
-let lv = 1;
+          <section class="status-board">
+            <div>
+              <span class="status-label">なかよし</span>
+              <strong id="friendshipValue">1</strong>
+            </div>
+            <div>
+              <span class="status-label">えさ</span>
+              <strong><span id="foodCount">0</span>こ</strong>
+            </div>
+            <button id="feedButton" class="feed-btn">ごはんをあげる</button>
+          </section>
 
-function feed() {
-  lv++;
-  document.getElementById("lv").innerText = lv;
-}
-</script>
+          <nav class="bottom-nav" aria-label="メニュー">
+            <button class="nav-btn" data-modal="shop">🛒<span>ショップ</span></button>
+            <button class="nav-btn" data-modal="missions">🎯<span>ミッション</span></button>
+          </nav>
+        </section>
+      </main>
 
-</body>
+      <div id="modalLayer" class="modal-layer" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+          <header class="modal-header">
+            <h2 id="modalTitle"></h2>
+            <button id="closeModal" class="icon-btn" aria-label="閉じる">×</button>
+          </header>
+          <div id="modalBody" class="modal-body"></div>
+        </div>
+      </div>
+
+      <div id="toast" class="toast" role="status"></div>
+    </div>
+
+    <script src="./js/config.js"></script>
+    <script src="./js/state.js"></script>
+    <script src="./js/app.js"></script>
+  </body>
 </html>
