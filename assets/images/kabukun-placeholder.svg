@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-label="かぶくんのプレースホルダー">
+  <defs>
+    <linearGradient id="body" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#fffef7"/>
+      <stop offset="1" stop-color="#f4ead9"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="8" flood-color="#24643d" flood-opacity=".22"/>
+    </filter>
+  </defs>
+  <path d="M157 71c-28-39-74-47-112-24 14 42 59 59 100 48-26-18-50-27-78-31 34-2 61 3 90 21Z" fill="#52bd68"/>
+  <path d="M166 75c-2-45 27-73 72-77 18 43-2 83-43 102 11-28 19-53 18-80-9 31-21 51-47 55Z" fill="#78d56e"/>
+  <path d="M162 82c19-42 61-57 104-42-4 48-42 76-88 72 23-21 42-36 69-46-34 5-58 15-85 16Z" fill="#3fae65"/>
+  <path filter="url(#shadow)" d="M70 155c0-54 39-91 90-91s90 37 90 91c0 69-43 138-90 138S70 224 70 155Z" fill="url(#body)"/>
+  <path d="M93 154c12-39 38-61 76-66" fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round" opacity=".72"/>
+  <circle cx="124" cy="164" r="10" fill="#263238"/>
+  <circle cx="196" cy="164" r="10" fill="#263238"/>
+  <circle cx="112" cy="190" r="13" fill="#ff9fb0" opacity=".72"/>
+  <circle cx="208" cy="190" r="13" fill="#ff9fb0" opacity=".72"/>
+  <path d="M138 199c15 15 31 15 45 0" fill="none" stroke="#263238" stroke-width="8" stroke-linecap="round"/>
+</svg>

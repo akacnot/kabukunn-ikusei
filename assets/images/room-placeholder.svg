@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 300" preserveAspectRatio="none" role="img" aria-label="背景のプレースホルダー">
+  <rect width="430" height="300" fill="#fbe7b8"/>
+  <path d="M0 80h430v220H0Z" fill="#afe2a8"/>
+  <path d="M0 210c62-34 128-34 198 0s148 35 232-4v94H0Z" fill="#8fd58f"/>
+  <path d="M36 64h104v76H36Z" fill="#fff7df"/>
+  <path d="M48 78h80v48H48Z" fill="#9fe4f0"/>
+  <path d="M288 78h72v132h-72Z" fill="#d39d6e"/>
+  <circle cx="324" cy="148" r="5" fill="#8a5a3a"/>
+</svg>
