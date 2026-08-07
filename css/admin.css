@@ -1,0 +1,138 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  color: #263238;
+  background: linear-gradient(180deg, #e8fff1, #fff5d8);
+}
+
+.admin-shell {
+  width: min(100% - 24px, 860px);
+  margin: 0 auto;
+  padding: 24px 0;
+  display: grid;
+  gap: 16px;
+}
+
+.admin-header,
+.admin-panel {
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 26px rgba(33, 72, 61, 0.12);
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+}
+
+.admin-header p,
+.admin-header h1,
+.admin-panel h2 {
+  margin: 0;
+}
+
+.admin-header p {
+  color: #2f8b4b;
+  font-weight: 900;
+}
+
+.admin-header a,
+button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 14px;
+  padding: 0 16px;
+  color: #fff;
+  background: #55bd70;
+  font: inherit;
+  font-weight: 900;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.admin-panel {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: #6a7b78;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 2px solid #dceadc;
+  border-radius: 14px;
+  padding: 12px;
+  color: #263238;
+  font: inherit;
+  font-weight: 800;
+}
+
+textarea {
+  min-height: 180px;
+  resize: vertical;
+}
+
+.gift-list {
+  display: grid;
+  gap: 8px;
+}
+
+.gift-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f7fff6;
+}
+
+.gift-card strong,
+.gift-card span {
+  display: block;
+}
+
+.gift-card span {
+  margin-top: 3px;
+  color: #6a7b78;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.danger {
+  background: #e9486f;
+}
+
+@media (max-width: 620px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}

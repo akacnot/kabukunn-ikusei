@@ -21,6 +21,7 @@
             <button class="secondary-btn" data-route="howto">遊び方</button>
             <button class="ghost-btn" data-action="show-preparing">利用規約・プライバシーポリシー</button>
           </div>
+          <span id="versionLabel" class="version-label">Ver. 1.00</span>
         </section>
 
         <section id="howtoScreen" class="screen">
@@ -47,6 +48,9 @@
         <section id="gameScreen" class="screen screen-game">
           <header class="hud">
             <button class="icon-btn glass" data-route="title" aria-label="タイトルへ戻る">🏠</button>
+            <div class="time-pill" aria-label="現在の時刻">
+              <span id="currentTime">--:--</span>
+            </div>
             <div class="coin-pill" aria-label="現在のコイン枚数">
               <img class="coin-icon" data-ui-image="coinIcon" alt="" />
               <span id="coinCount">0</span>
@@ -72,9 +76,13 @@
               <strong><span id="foodCount">0</span>こ</strong>
             </div>
             <button id="feedButton" class="feed-btn">ごはんをあげる</button>
-            <button id="minigameButton" class="minigame-btn">かぶキャッチで稼ぐ</button>
-            <button id="earnButton" class="earn-btn">おてつだいでコインをもらう</button>
-            <button id="photoButton" class="photo-btn">写真をえらぶ</button>
+            <div class="action-grid">
+              <button id="battleButton" class="battle-btn">バトル</button>
+              <button id="minigameButton" class="minigame-btn">かぶキャッチ</button>
+              <button id="earnButton" class="earn-btn">おてつだい</button>
+              <button id="friendButton" class="friend-btn">フレンド</button>
+              <button id="photoButton" class="photo-btn">写真</button>
+            </div>
             <input id="photoInput" class="visually-hidden" type="file" accept="image/*" />
           </section>
 
@@ -82,7 +90,7 @@
             <button class="nav-btn image-only" data-modal="shop" aria-label="ショップ">
               <img data-ui-image="shopIcon" alt="" />
             </button>
-            <button class="nav-btn image-only" data-modal="missions" aria-label="ミッション">
+            <button id="missionNavButton" class="nav-btn image-only" data-modal="missions" aria-label="ミッション">
               <img data-ui-image="missionIcon" alt="" />
             </button>
           </nav>

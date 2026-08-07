@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>かぶくん 管理者設定</title>
+    <link rel="stylesheet" href="./css/admin.css" />
+  </head>
+  <body>
+    <main class="admin-shell">
+      <header class="admin-header">
+        <div>
+          <p>かぶくん運営</p>
+          <h1>管理者設定</h1>
+        </div>
+        <a href="./index.html">ゲームへ</a>
+      </header>
+
+      <section class="admin-panel">
+        <h2>配布コード作成</h2>
+        <div class="form-grid">
+          <label>
+            コード
+            <input id="giftCode" type="text" placeholder="例: SUMMER110" />
+          </label>
+          <label>
+            表示名
+            <input id="giftLabel" type="text" placeholder="例: 夏の配布" />
+          </label>
+          <label>
+            コイン
+            <input id="giftCoins" type="number" min="0" value="100" />
+          </label>
+          <label>
+            えさ
+            <input id="giftFood" type="number" min="0" value="1" />
+          </label>
+        </div>
+        <button id="saveGift" class="primary-admin">コードを保存</button>
+      </section>
+
+      <section class="admin-panel">
+        <h2>保存中の配布</h2>
+        <div id="giftList" class="gift-list"></div>
+        <div class="admin-actions">
+          <button id="copyJson">JSONをコピー</button>
+          <button id="downloadJson">JSONを保存</button>
+          <button id="clearGifts" class="danger">全削除</button>
+        </div>
+        <textarea id="jsonOutput" readonly></textarea>
+      </section>
+
+      <section class="admin-panel">
+        <h2>ミッション作成</h2>
+        <div class="form-grid">
+          <label>
+            ミッションID
+            <input id="missionId" type="text" placeholder="例: daily_feed_3" />
+          </label>
+          <label>
+            タイトル
+            <input id="missionTitle" type="text" placeholder="例: ごはんを3回あげる" />
+          </label>
+          <label>
+            種類
+            <select id="missionMetric">
+              <option value="fedCount">ごはん回数</option>
+              <option value="helpCoins">おてつだいコイン</option>
+              <option value="minigameCoins">かぶキャッチコイン</option>
+              <option value="battleWins">バトル勝利</option>
+              <option value="coins">所持コイン</option>
+              <option value="loginDays">ログイン</option>
+            </select>
+          </label>
+          <label>
+            目標
+            <input id="missionTarget" type="number" min="1" value="1" />
+          </label>
+          <label>
+            コイン報酬
+            <input id="missionCoins" type="number" min="0" value="30" />
+          </label>
+          <label>
+            えさ報酬
+            <input id="missionFood" type="number" min="0" value="0" />
+          </label>
+          <label>
+            更新
+            <select id="missionReset">
+              <option value="daily">毎日</option>
+              <option value="once">一回だけ</option>
+            </select>
+          </label>
+        </div>
+        <button id="saveMission" class="primary-admin">ミッションを保存</button>
+      </section>
+
+      <section class="admin-panel">
+        <h2>保存中のミッション</h2>
+        <div id="missionList" class="gift-list"></div>
+      </section>
+    </main>
+
+    <script src="./js/admin.js"></script>
+  </body>
+</html>
