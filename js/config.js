@@ -153,9 +153,9 @@ const GAME_CONFIG = {
       label: "リリース記念",
       rewards: { coins: 100, food: 1 }
     },
-    WELCOME: {
-      label: "ようこそギフト",
-      rewards: { coins: 50, food: 2 }
+    SUMMER2026: {
+      label: "夏限定ギフト",
+      rewards: { coins: 300, food: 5 }
     }
   }
 };
