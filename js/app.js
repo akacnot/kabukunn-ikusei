@@ -295,7 +295,7 @@ function renderShop(activeTab) {
   if (activeTab === "gift") {
     return `${tabs}
       <section class="gift-panel">
-        <p class="gift-note">コードを入力すると特典を受け取れます。例: KABU100 / WELCOME</p>
+        <p class="gift-note">コードを入力すると特典を受け取れます。例:WELCOME</p>
         <input id="giftInput" class="gift-input" type="text" inputmode="latin" autocomplete="off" placeholder="コードを入力" />
         <button class="gift-submit" data-action="redeem-gift">受け取る</button>
       </section>`;
