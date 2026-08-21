@@ -172,6 +172,7 @@ h1 {
 .minigame-btn,
 .earn-btn,
 .friend-btn,
+.profile-btn,
 .photo-btn,
 .buy-btn,
 .claim-btn,
@@ -446,8 +447,16 @@ button:active {
   box-shadow: 0 6px 0 #6048ad;
 }
 
+.profile-btn {
+  color: #fff;
+  background: linear-gradient(180deg, #ffd36a, #f3a92f);
+  box-shadow: 0 6px 0 #bd791b;
+}
+
 .photo-btn {
-  grid-column: 1 / -1;
+  color: var(--leaf-dark);
+  background: #fff;
+  box-shadow: 0 6px 0 #d3ead4;
 }
 
 .visually-hidden {
@@ -932,6 +941,69 @@ button:active {
   gap: 12px;
 }
 
+.profile-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.profile-card {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(33, 72, 61, 0.08);
+  text-align: center;
+}
+
+.profile-icon {
+  width: 82px;
+  height: 82px;
+  object-fit: contain;
+  border-radius: 24px;
+  background: #f4fff4;
+}
+
+.profile-stats {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.profile-stats span {
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #f4fff4;
+  font-weight: 900;
+}
+
+.icon-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.icon-option {
+  min-height: 72px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 6px 14px rgba(33, 72, 61, 0.08);
+}
+
+.icon-option.is-selected {
+  outline: 3px solid var(--leaf);
+}
+
+.icon-option img {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+}
+
 .help-tasks {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -970,6 +1042,7 @@ button:active {
 }
 
 .friend-code-box span,
+.friend-code-box small,
 .friend-row small {
   color: var(--muted);
   font-size: 12px;
@@ -1011,6 +1084,36 @@ button:active {
   border-radius: 999px;
   background: #eef8ff;
   color: #39739d;
+  font-weight: 900;
+}
+
+.friend-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(33, 72, 61, 0.08);
+}
+
+.friend-card strong {
+  color: var(--leaf-dark);
+}
+
+.friend-card div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.friend-card span {
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #f4fff4;
+  color: var(--ink);
+  font-size: 12px;
   font-weight: 900;
 }
 
@@ -1135,6 +1238,7 @@ button:active {
   .minigame-btn,
   .earn-btn,
   .friend-btn,
+  .profile-btn,
   .photo-btn {
     min-height: 46px;
   }

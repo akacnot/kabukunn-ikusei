@@ -38,6 +38,8 @@ const Store = {
   }
 };
 
+window.Store = Store;
+
 function getTodayKey() {
   return new Date().toLocaleDateString("sv-SE");
 }

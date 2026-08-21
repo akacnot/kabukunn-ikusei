@@ -1,0 +1,94 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function validProfileCreate(uid) {
+      return isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.playerCode is string
+        && request.resource.data.playerCode.matches('^[0-9]{12}$')
+        && request.resource.data.nickname is string
+        && request.resource.data.nickname.size() >= 1
+        && request.resource.data.nickname.size() <= 12
+        && request.resource.data.iconId is string
+        && request.resource.data.coins is int
+        && request.resource.data.coins >= 0
+        && request.resource.data.friendship is int
+        && request.resource.data.friendship >= 1
+        && request.resource.data.friends is list;
+    }
+
+    function validProfileUpdate(uid) {
+      return isOwner(uid)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.playerCode == resource.data.playerCode
+        && request.resource.data.nickname is string
+        && request.resource.data.nickname.size() >= 1
+        && request.resource.data.nickname.size() <= 12
+        && request.resource.data.iconId is string
+        && request.resource.data.coins is int
+        && request.resource.data.coins >= 0
+        && request.resource.data.coins <= resource.data.coins + 100
+        && request.resource.data.friendship is int
+        && request.resource.data.friendship >= resource.data.friendship
+        && request.resource.data.friendship <= resource.data.friendship + 10
+        && request.resource.data.friends is list;
+    }
+
+    function validFriendAcceptUpdate(uid) {
+      return signedIn()
+        && request.auth.uid != uid
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['friends', 'updatedAt'])
+        && request.auth.uid in request.resource.data.friends
+        && !(request.auth.uid in resource.data.friends)
+        && exists(/databases/$(database)/documents/friendRequests/$(uid + '_' + request.auth.uid))
+        && get(/databases/$(database)/documents/friendRequests/$(uid + '_' + request.auth.uid)).data.status == 'pending';
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create: if validProfileCreate(uid);
+      allow update: if validProfileUpdate(uid) || validFriendAcceptUpdate(uid);
+      allow delete: if false;
+    }
+
+    match /playerCodes/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && code.matches('^[0-9]{12}$')
+        && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /friendRequests/{requestId} {
+      allow read: if signedIn()
+        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+
+      allow create: if signedIn()
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.toUid is string
+        && request.resource.data.toUid != request.auth.uid
+        && exists(/databases/$(database)/documents/users/$(request.resource.data.toUid))
+        && request.resource.data.status == 'pending'
+        && request.resource.data.fromCode is string
+        && request.resource.data.toCode is string;
+
+      allow update: if signedIn()
+        && resource.data.toUid == request.auth.uid
+        && request.resource.data.fromUid == resource.data.fromUid
+        && request.resource.data.toUid == resource.data.toUid
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'approved';
+
+      allow delete: if false;
+    }
+  }
+}

@@ -1,3 +1,6 @@
+import * as FirebaseService from "./firebase-service.js";
+
+const { GAME_CONFIG, Store } = window;
 const state = Store.load();
 
 const els = {
@@ -15,6 +18,7 @@ const els = {
   earnButton: document.querySelector("#earnButton"),
   minigameButton: document.querySelector("#minigameButton"),
   friendButton: document.querySelector("#friendButton"),
+  profileButton: document.querySelector("#profileButton"),
   photoButton: document.querySelector("#photoButton"),
   photoInput: document.querySelector("#photoInput"),
   kabukunButton: document.querySelector("#kabukunButton"),
@@ -33,10 +37,24 @@ let clockTimer = 0;
 let miniGame = null;
 let helpGame = null;
 let battle = null;
+let serverFriends = null;
+
+function canUseFirebase() {
+  return FirebaseService.isFirebaseReady();
+}
+
+async function syncProfile() {
+  try {
+    await FirebaseService.syncProfile(state);
+  } catch {
+    // Firebase設定前でもローカルセーブは動くようにします。
+  }
+}
 
 function persist() {
   Store.save(state);
   renderHud();
+  syncProfile();
 }
 
 function routeTo(name) {
@@ -55,6 +73,15 @@ function renderImages() {
     const key = image.dataset.uiImage;
     image.src = GAME_CONFIG.images[key];
   });
+}
+
+function getIconSrc(iconId) {
+  const icons = {
+    kabukun_01: GAME_CONFIG.images.kabukun,
+    kabukun_02: GAME_CONFIG.images.foodIcon,
+    kabukun_03: GAME_CONFIG.images.coinIcon
+  };
+  return icons[iconId] || icons.kabukun_01;
 }
 
 function renderHud() {
@@ -295,7 +322,7 @@ function renderShop(activeTab) {
   if (activeTab === "gift") {
     return `${tabs}
       <section class="gift-panel">
-        <p class="gift-note">コードを入力すると特典を受け取れます。例:WELCOME</p>
+        <p class="gift-note">コードを入力すると特典を受け取れます。例: KABU100 / WELCOME</p>
         <input id="giftInput" class="gift-input" type="text" inputmode="latin" autocomplete="off" placeholder="コードを入力" />
         <button class="gift-submit" data-action="redeem-gift">受け取る</button>
       </section>`;
@@ -366,21 +393,48 @@ function getGiftCode(code) {
   return GAME_CONFIG.giftCodes[code] || adminGifts[code];
 }
 
-function openFriends() {
-  const requests = state.friendRequests.length
-    ? state.friendRequests
+async function openFriends() {
+  await syncProfile();
+  serverFriends = await loadServerFriends();
+  const incomingRequests = serverFriends
+    ? serverFriends.incoming.map((request) => ({
+        id: request.id,
+        code: request.fromCode,
+        nickname: request.fromNickname,
+        iconId: request.fromIconId,
+        source: "firebase"
+      }))
+    : [];
+  const localRequests = state.friendRequests.map((request) => ({ code: request.code, source: "local" }));
+  const allRequests = [...incomingRequests, ...localRequests];
+  const requests = allRequests.length
+    ? allRequests
         .map(
           (request) => `
             <article class="friend-row">
-              <div><strong>${request.code}</strong><small>申請中</small></div>
-              <button class="claim-btn" data-approve-friend="${request.code}">承認</button>
+              <div><strong>${request.nickname || request.code}</strong><small>${request.code} / ${request.source === "firebase" ? "Firebase申請" : "ローカル申請"}</small></div>
+              <button class="claim-btn" data-approve-friend="${request.id || request.code}" data-approve-code="${request.code}" data-approve-source="${request.source}">承認</button>
             </article>`
         )
         .join("")
     : `<p class="gift-note">申請はまだありません。</p>`;
 
-  const friends = state.friends.length
-    ? state.friends.map((friend) => `<span class="friend-chip">${friend.code}</span>`).join("")
+  const friends = getFriendProfiles();
+  const friendList = friends.length
+    ? friends
+        .map(
+          (friend) => `
+            <article class="friend-card">
+              <img class="profile-icon" src="${getIconSrc(friend.iconId)}" alt="" />
+              <strong>${friend.nickname || friend.code}</strong>
+              <small>${friend.code || friend.playerCode}</small>
+              <div>
+                <span>🪙 ${Number(friend.coins || 0).toLocaleString("ja-JP")}</span>
+                <span>なかよし ${Number(friend.friendship || 1).toLocaleString("ja-JP")}</span>
+              </div>
+            </article>`
+        )
+        .join("")
     : `<p class="gift-note">フレンドはまだいません。</p>`;
 
   openModal("フレンド", `
@@ -388,15 +442,37 @@ function openFriends() {
       <div class="friend-code-box">
         <span>自分のコード</span>
         <strong>${state.friendCode}</strong>
+        <small>${canUseFirebase() ? "Firebase同期: 有効" : "Firebase同期: 設定待ち"}</small>
       </div>
       <input id="friendCodeInput" class="gift-input" type="text" inputmode="numeric" maxlength="12" placeholder="12桁のフレンドコード" />
       <button class="gift-submit" data-action="send-friend-request">申請する</button>
       <h3>申請</h3>
       <div class="friend-list">${requests}</div>
       <h3>フレンド</h3>
-      <div class="friend-chips">${friends}</div>
+      <div class="friend-chips">${friendList}</div>
     </section>
   `);
+}
+
+async function loadServerFriends() {
+  if (!canUseFirebase()) return null;
+  try {
+    return await FirebaseService.getFriendState();
+  } catch {
+    return null;
+  }
+}
+
+function getFriendProfiles() {
+  const serverProfiles = serverFriends?.friends || [];
+  const localProfiles = state.friends.map((friend) => ({
+    code: friend.code,
+    coins: friend.coins ?? 0,
+    friendship: friend.friendship ?? 1
+  }));
+  const byCode = new Map();
+  [...localProfiles, ...serverProfiles].forEach((friend) => byCode.set(friend.code, friend));
+  return [...byCode.values()];
 }
 
 function sendFriendRequest() {
@@ -414,18 +490,91 @@ function sendFriendRequest() {
     showToast("すでに登録済みです");
     return;
   }
-  state.friendRequests.push({ code, createdAt: Date.now() });
+  state.friendRequests.push({ code, coins: 0, friendship: 1, createdAt: Date.now() });
   persist();
+  sendFriendRequestToServer(code);
   openFriends();
   showToast("フレンド申請を送りました");
 }
 
-function approveFriend(code) {
-  state.friendRequests = state.friendRequests.filter((request) => request.code !== code);
-  state.friends.push({ code, approvedAt: Date.now() });
+async function sendFriendRequestToServer(code) {
+  try {
+    await FirebaseService.sendFriendRequestByCode(code);
+  } catch {
+    // Firebase未設定や相手未作成でも、既存のローカル挙動は残します。
+  }
+}
+
+async function approveFriend(identifier, source = "local", friendCode = identifier) {
+  if (source === "firebase") {
+    try {
+      await FirebaseService.approveFriendRequest(identifier);
+    } catch {
+      showToast("Firebase承認に失敗しました");
+      return;
+    }
+  }
+  state.friendRequests = state.friendRequests.filter((request) => request.code !== friendCode);
+  if (!state.friends.some((friend) => friend.code === friendCode)) {
+    state.friends.push({ code: friendCode, coins: 0, friendship: 1, approvedAt: Date.now() });
+  }
   persist();
   openFriends();
   showToast("フレンドになりました");
+}
+
+async function openProfile() {
+  await syncProfile();
+  const profile = FirebaseService.getCurrentProfile();
+  const nickname = profile?.nickname || state.nickname || "かぶくん";
+  const iconId = profile?.iconId || state.iconId || "kabukun_01";
+  const friendCount = profile?.friendCount ?? state.friends.length;
+
+  openModal("プロフィール", `
+    <section class="profile-panel">
+      <div class="profile-card">
+        <img class="profile-icon" src="${getIconSrc(iconId)}" alt="" />
+        <h3>${nickname}</h3>
+        <small>${state.friendCode}</small>
+        <div class="profile-stats">
+          <span>🪙 ${Number(state.coins || 0).toLocaleString("ja-JP")}</span>
+          <span>フレンド ${Number(friendCount || 0).toLocaleString("ja-JP")}</span>
+        </div>
+      </div>
+      <input id="nicknameInput" class="gift-input" type="text" maxlength="12" value="${nickname}" placeholder="ニックネーム" />
+      <div class="icon-options">
+        ${["kabukun_01", "kabukun_02", "kabukun_03"]
+          .map(
+            (id) => `
+              <button class="icon-option ${id === iconId ? "is-selected" : ""}" data-icon-id="${id}">
+                <img src="${getIconSrc(id)}" alt="" />
+              </button>`
+          )
+          .join("")}
+      </div>
+      <button class="gift-submit" data-action="save-profile">保存</button>
+      <p class="gift-note">アイコン画像そのものは保存せず、iconIdだけをFirebaseへ保存します。</p>
+    </section>
+  `);
+}
+
+async function saveProfile() {
+  const nickname = document.querySelector("#nicknameInput")?.value.trim() || "";
+  const iconId = document.querySelector(".icon-option.is-selected")?.dataset.iconId || "kabukun_01";
+  if (nickname.length < 1 || nickname.length > 12) {
+    showToast("ニックネームは1〜12文字です");
+    return;
+  }
+  state.nickname = nickname;
+  state.iconId = iconId;
+  Store.save(state);
+  try {
+    await FirebaseService.updateProfile({ nickname, iconId });
+    showToast("プロフィールを保存しました");
+  } catch {
+    showToast("ローカルに保存しました");
+  }
+  openProfile();
 }
 
 function openMissions() {
@@ -771,6 +920,7 @@ function bindEvents() {
     const helpTask = event.target.closest("[data-help-task]");
     const approveButton = event.target.closest("[data-approve-friend]");
     const battleSkill = event.target.closest("[data-battle-skill]");
+    const iconOption = event.target.closest("[data-icon-id]");
 
     if (routeButton) routeTo(routeButton.dataset.route);
     if (modalButton?.dataset.modal === "shop") openShop();
@@ -782,6 +932,7 @@ function bindEvents() {
     if (actionButton?.dataset.action === "open-help") openHelpGame();
     if (actionButton?.dataset.action === "start-help") startHelpGame();
     if (actionButton?.dataset.action === "send-friend-request") sendFriendRequest();
+    if (actionButton?.dataset.action === "save-profile") saveProfile();
     if (actionButton?.dataset.action === "open-battle") openBattle();
     if (actionButton?.dataset.action === "start-solo-battle") startSoloBattle();
     if (shopTabButton) openShop(shopTabButton.dataset.shopTab);
@@ -789,8 +940,12 @@ function bindEvents() {
     if (feedButton) feedKabukun(feedButton.dataset.feedFood);
     if (claimButton) claimMission(claimButton.dataset.claimMission);
     if (helpTask) tapHelpTask(Number(helpTask.dataset.helpTask));
-    if (approveButton) approveFriend(approveButton.dataset.approveFriend);
+    if (approveButton) approveFriend(approveButton.dataset.approveFriend, approveButton.dataset.approveSource, approveButton.dataset.approveCode);
     if (battleSkill) useBattleSkill(battleSkill.dataset.battleSkill);
+    if (iconOption) {
+      document.querySelectorAll(".icon-option").forEach((button) => button.classList.remove("is-selected"));
+      iconOption.classList.add("is-selected");
+    }
   });
 
   els.closeModal.addEventListener("click", closeModal);
@@ -802,16 +957,28 @@ function bindEvents() {
   els.earnButton.addEventListener("click", openHelpGame);
   els.minigameButton.addEventListener("click", openMinigame);
   els.friendButton.addEventListener("click", openFriends);
+  els.profileButton.addEventListener("click", openProfile);
   els.photoButton.addEventListener("click", () => els.photoInput.click());
   els.photoInput.addEventListener("change", (event) => choosePhoto(event.target.files[0]));
   els.kabukunButton.addEventListener("click", openFeedMenu);
 }
 
-function init() {
+async function init() {
   bindEvents();
   renderImages();
   renderHud();
   renderClock();
+  const firebaseResult = await FirebaseService.initKabukunFirebase(state);
+  if (firebaseResult.available && firebaseResult.profile) {
+    state.friendCode = firebaseResult.profile.playerCode || state.friendCode;
+    state.nickname = firebaseResult.profile.nickname || state.nickname;
+    state.iconId = firebaseResult.profile.iconId || state.iconId;
+    state.coins = Number(firebaseResult.profile.coins ?? state.coins);
+    state.friendship = Number(firebaseResult.profile.friendship ?? state.friendship);
+    Store.save(state);
+    renderHud();
+  }
+  syncProfile();
   earnTimer = setInterval(renderEarnButton, 1000);
   clockTimer = setInterval(renderClock, 1000);
   window.addEventListener("beforeunload", () => {

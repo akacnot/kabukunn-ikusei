@@ -1,4 +1,4 @@
-const GAME_CONFIG = {
+window.GAME_CONFIG = {
   appVersion: "1.10",
 
   initialState: {
@@ -159,3 +159,5 @@ const GAME_CONFIG = {
     }
   }
 };
+
+const GAME_CONFIG = window.GAME_CONFIG;
