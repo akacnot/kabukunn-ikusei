@@ -11,6 +11,7 @@ import {
   getDoc,
   getDocs,
   getFirestore,
+  onSnapshot,
   query,
   runTransaction,
   serverTimestamp,
@@ -53,6 +54,10 @@ export function isFirebaseReady() {
 
 export function getCurrentProfile() {
   return currentProfile;
+}
+
+export function getCurrentUid() {
+  return currentUser?.uid || null;
 }
 
 export async function syncProfile(localState) {
@@ -120,6 +125,86 @@ export async function getFriendState() {
   };
 }
 
+export function listenFriendState(onChange) {
+  if (!firebaseReady || !currentUser) return () => {};
+
+  const unsubscribers = [];
+  const friendUnsubscribers = new Map();
+  const friendProfiles = new Map();
+  let profile = currentProfile;
+  let incoming = [];
+  let outgoing = [];
+
+  const emit = () => {
+    onChange({
+      profile: publicProfile(profile),
+      friends: [...friendProfiles.values()],
+      incoming,
+      outgoing
+    });
+  };
+
+  const syncFriendProfileListeners = (friendUids) => {
+    const nextUids = new Set(friendUids || []);
+
+    friendUnsubscribers.forEach((unsubscribe, uid) => {
+      if (!nextUids.has(uid)) {
+        unsubscribe();
+        friendUnsubscribers.delete(uid);
+        friendProfiles.delete(uid);
+      }
+    });
+
+    nextUids.forEach((uid) => {
+      if (uid === currentUser.uid || friendUnsubscribers.has(uid)) return;
+      const unsubscribe = onSnapshot(doc(db, "users", uid), (snapshot) => {
+        if (snapshot.exists()) {
+          friendProfiles.set(uid, publicProfile(snapshot.data()));
+        } else {
+          friendProfiles.delete(uid);
+        }
+        emit();
+      });
+      friendUnsubscribers.set(uid, unsubscribe);
+    });
+  };
+
+  unsubscribers.push(
+    onSnapshot(doc(db, "users", currentUser.uid), (snapshot) => {
+      if (!snapshot.exists()) return;
+      profile = snapshot.data();
+      currentProfile = profile;
+      syncFriendProfileListeners(profile.friends || []);
+      emit();
+    })
+  );
+
+  unsubscribers.push(
+    onSnapshot(
+      query(collection(db, "friendRequests"), where("toUid", "==", currentUser.uid), where("status", "==", REQUEST_STATUS.pending)),
+      (snapshot) => {
+        incoming = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+        emit();
+      }
+    )
+  );
+
+  unsubscribers.push(
+    onSnapshot(
+      query(collection(db, "friendRequests"), where("fromUid", "==", currentUser.uid), where("status", "==", REQUEST_STATUS.pending)),
+      (snapshot) => {
+        outgoing = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+        emit();
+      }
+    )
+  );
+
+  return () => {
+    unsubscribers.forEach((unsubscribe) => unsubscribe());
+    friendUnsubscribers.forEach((unsubscribe) => unsubscribe());
+  };
+}
+
 export async function sendFriendRequestByCode(targetCode) {
   if (!firebaseReady || !currentUser) throw new Error("firebase_not_ready");
   if (!/^\d{12}$/.test(targetCode)) throw new Error("invalid_code");
@@ -129,21 +214,29 @@ export async function sendFriendRequestByCode(targetCode) {
   if (!targetCodeSnap.exists()) throw new Error("not_found");
   const targetUid = targetCodeSnap.data().uid;
   const requestId = `${currentUser.uid}_${targetUid}`;
+  const reverseRequestId = `${targetUid}_${currentUser.uid}`;
 
   await runTransaction(db, async (transaction) => {
     const meRef = doc(db, "users", currentUser.uid);
     const targetRef = doc(db, "users", targetUid);
     const requestRef = doc(db, "friendRequests", requestId);
-    const [meSnap, targetSnap, requestSnap] = await Promise.all([
+    const reverseRequestRef = doc(db, "friendRequests", reverseRequestId);
+    const [meSnap, targetSnap, requestSnap, reverseRequestSnap] = await Promise.all([
       transaction.get(meRef),
       transaction.get(targetRef),
-      transaction.get(requestRef)
+      transaction.get(requestRef),
+      transaction.get(reverseRequestRef)
     ]);
     const me = meSnap.data();
     const target = targetSnap.data();
     if (!me || !target) throw new Error("profile_missing");
-    if ((me.friends || []).includes(targetUid)) throw new Error("already_friend");
+    if ((me.friends || []).includes(targetUid) || (target.friends || []).includes(currentUser.uid)) {
+      throw new Error("already_friend");
+    }
     if (requestSnap.exists() && requestSnap.data().status === REQUEST_STATUS.pending) {
+      throw new Error("duplicate_request");
+    }
+    if (reverseRequestSnap.exists() && reverseRequestSnap.data().status === REQUEST_STATUS.pending) {
       throw new Error("duplicate_request");
     }
     transaction.set(requestRef, {
@@ -171,6 +264,7 @@ export async function approveFriendRequest(requestId) {
     if (!requestSnap.exists()) throw new Error("request_missing");
     const request = requestSnap.data();
     if (request.toUid !== currentUser.uid) throw new Error("not_owner");
+    if (request.fromUid === currentUser.uid) throw new Error("invalid_request");
     if (request.status !== REQUEST_STATUS.pending) throw new Error("not_pending");
 
     transaction.update(doc(db, "users", currentUser.uid), {

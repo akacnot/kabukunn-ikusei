@@ -1076,6 +1076,16 @@ button:active {
   display: block;
 }
 
+.status-pill {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #fff3d7;
+  color: #9a6500;
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .friend-chip {
   display: inline-flex;
   align-items: center;

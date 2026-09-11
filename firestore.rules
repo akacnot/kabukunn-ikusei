@@ -73,16 +73,28 @@ service cloud.firestore {
         && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
 
       allow create: if signedIn()
+        && requestId == request.auth.uid + '_' + request.resource.data.toUid
+        && request.resource.data.keys().hasOnly(['fromUid', 'fromCode', 'fromNickname', 'fromIconId', 'toUid', 'toCode', 'status', 'createdAt', 'updatedAt'])
         && request.resource.data.fromUid == request.auth.uid
         && request.resource.data.toUid is string
         && request.resource.data.toUid != request.auth.uid
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && exists(/databases/$(database)/documents/users/$(request.resource.data.toUid))
         && request.resource.data.status == 'pending'
         && request.resource.data.fromCode is string
-        && request.resource.data.toCode is string;
+        && request.resource.data.fromCode.matches('^[0-9]{12}$')
+        && request.resource.data.toCode is string
+        && request.resource.data.toCode.matches('^[0-9]{12}$')
+        && request.resource.data.fromCode == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.playerCode
+        && request.resource.data.toCode == get(/databases/$(database)/documents/users/$(request.resource.data.toUid)).data.playerCode
+        && !(request.resource.data.toUid in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.friends)
+        && !(request.auth.uid in get(/databases/$(database)/documents/users/$(request.resource.data.toUid)).data.friends)
+        && !exists(/databases/$(database)/documents/friendRequests/$(request.resource.data.toUid + '_' + request.auth.uid));
 
       allow update: if signedIn()
         && resource.data.toUid == request.auth.uid
+        && resource.data.fromUid != request.auth.uid
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'updatedAt'])
         && request.resource.data.fromUid == resource.data.fromUid
         && request.resource.data.toUid == resource.data.toUid
         && resource.data.status == 'pending'

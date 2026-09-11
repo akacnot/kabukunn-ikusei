@@ -38,6 +38,7 @@ let miniGame = null;
 let helpGame = null;
 let battle = null;
 let serverFriends = null;
+let friendStateUnsubscribe = null;
 
 function canUseFirebase() {
   return FirebaseService.isFirebaseReady();
@@ -396,6 +397,10 @@ function getGiftCode(code) {
 async function openFriends() {
   await syncProfile();
   serverFriends = await loadServerFriends();
+  openModal("フレンド", renderFriendPanel());
+}
+
+function renderFriendPanel() {
   const incomingRequests = serverFriends
     ? serverFriends.incoming.map((request) => ({
         id: request.id,
@@ -405,19 +410,37 @@ async function openFriends() {
         source: "firebase"
       }))
     : [];
-  const localRequests = state.friendRequests.map((request) => ({ code: request.code, source: "local" }));
-  const allRequests = [...incomingRequests, ...localRequests];
-  const requests = allRequests.length
-    ? allRequests
+  const outgoingRequests = serverFriends
+    ? serverFriends.outgoing.map((request) => ({
+        id: request.id,
+        code: request.toCode,
+        nickname: request.toNickname,
+        source: "firebase"
+      }))
+    : state.friendRequests.map((request) => ({ code: request.code, source: "local" }));
+
+  const requests = incomingRequests.length
+    ? incomingRequests
         .map(
           (request) => `
             <article class="friend-row">
-              <div><strong>${request.nickname || request.code}</strong><small>${request.code} / ${request.source === "firebase" ? "Firebase申請" : "ローカル申請"}</small></div>
-              <button class="claim-btn" data-approve-friend="${request.id || request.code}" data-approve-code="${request.code}" data-approve-source="${request.source}">承認</button>
+              <div><strong>${request.nickname || request.code}</strong><small>${request.code} / 受信した申請</small></div>
+              <button class="claim-btn" data-approve-friend="${request.id}" data-approve-code="${request.code}" data-approve-source="${request.source}">承認</button>
             </article>`
         )
         .join("")
     : `<p class="gift-note">申請はまだありません。</p>`;
+  const outgoing = outgoingRequests.length
+    ? outgoingRequests
+        .map(
+          (request) => `
+            <article class="friend-row is-pending">
+              <div><strong>${request.nickname || request.code}</strong><small>${request.code} / 相手の承認待ち</small></div>
+              <span class="status-pill">申請中</span>
+            </article>`
+        )
+        .join("")
+    : `<p class="gift-note">送信中の申請はありません。</p>`;
 
   const friends = getFriendProfiles();
   const friendList = friends.length
@@ -437,7 +460,7 @@ async function openFriends() {
         .join("")
     : `<p class="gift-note">フレンドはまだいません。</p>`;
 
-  openModal("フレンド", `
+  return `
     <section class="friend-panel">
       <div class="friend-code-box">
         <span>自分のコード</span>
@@ -446,12 +469,14 @@ async function openFriends() {
       </div>
       <input id="friendCodeInput" class="gift-input" type="text" inputmode="numeric" maxlength="12" placeholder="12桁のフレンドコード" />
       <button class="gift-submit" data-action="send-friend-request">申請する</button>
-      <h3>申請</h3>
+      <h3>届いた申請</h3>
       <div class="friend-list">${requests}</div>
+      <h3>送った申請</h3>
+      <div class="friend-list">${outgoing}</div>
       <h3>フレンド</h3>
       <div class="friend-chips">${friendList}</div>
     </section>
-  `);
+  `;
 }
 
 async function loadServerFriends() {
@@ -465,6 +490,8 @@ async function loadServerFriends() {
 
 function getFriendProfiles() {
   const serverProfiles = serverFriends?.friends || [];
+  if (canUseFirebase()) return serverProfiles;
+
   const localProfiles = state.friends.map((friend) => ({
     code: friend.code,
     coins: friend.coins ?? 0,
@@ -475,7 +502,7 @@ function getFriendProfiles() {
   return [...byCode.values()];
 }
 
-function sendFriendRequest() {
+async function sendFriendRequest() {
   const input = document.querySelector("#friendCodeInput");
   const code = (input?.value || "").replace(/\D/g, "");
   if (code.length !== 12) {
@@ -486,29 +513,46 @@ function sendFriendRequest() {
     showToast("自分のコードには申請できません");
     return;
   }
-  if (state.friends.some((friend) => friend.code === code) || state.friendRequests.some((request) => request.code === code)) {
+  const existingServerFriend = serverFriends?.friends?.some((friend) => friend.code === code || friend.playerCode === code);
+  const existingOutgoing = serverFriends?.outgoing?.some((request) => request.toCode === code);
+  const existingIncoming = serverFriends?.incoming?.some((request) => request.fromCode === code);
+  if (
+    existingServerFriend ||
+    existingOutgoing ||
+    existingIncoming ||
+    state.friends.some((friend) => friend.code === code) ||
+    state.friendRequests.some((request) => request.code === code)
+  ) {
     showToast("すでに登録済みです");
     return;
   }
+
+  if (canUseFirebase()) {
+    try {
+      await FirebaseService.sendFriendRequestByCode(code);
+      serverFriends = await loadServerFriends();
+      if (els.modalTitle.textContent === "フレンド") els.modalBody.innerHTML = renderFriendPanel();
+      showToast("フレンド申請を送りました");
+    } catch (error) {
+      showToast(getFriendErrorMessage(error));
+    }
+    return;
+  }
+
   state.friendRequests.push({ code, coins: 0, friendship: 1, createdAt: Date.now() });
   persist();
-  sendFriendRequestToServer(code);
   openFriends();
   showToast("フレンド申請を送りました");
-}
-
-async function sendFriendRequestToServer(code) {
-  try {
-    await FirebaseService.sendFriendRequestByCode(code);
-  } catch {
-    // Firebase未設定や相手未作成でも、既存のローカル挙動は残します。
-  }
 }
 
 async function approveFriend(identifier, source = "local", friendCode = identifier) {
   if (source === "firebase") {
     try {
       await FirebaseService.approveFriendRequest(identifier);
+      serverFriends = await loadServerFriends();
+      if (els.modalTitle.textContent === "フレンド") els.modalBody.innerHTML = renderFriendPanel();
+      showToast("フレンドになりました");
+      return;
     } catch {
       showToast("Firebase承認に失敗しました");
       return;
@@ -521,6 +565,26 @@ async function approveFriend(identifier, source = "local", friendCode = identifi
   persist();
   openFriends();
   showToast("フレンドになりました");
+}
+
+function getFriendErrorMessage(error) {
+  const message = error?.message || "";
+  if (message.includes("same_code")) return "自分のコードには申請できません";
+  if (message.includes("not_found")) return "相手のコードが見つかりません";
+  if (message.includes("already_friend")) return "すでにフレンドです";
+  if (message.includes("duplicate_request")) return "すでに申請中です";
+  if (message.includes("invalid_code")) return "12桁のコードを入力してください";
+  return "フレンド申請に失敗しました";
+}
+
+function startFriendRealtime() {
+  if (!canUseFirebase() || friendStateUnsubscribe) return;
+  friendStateUnsubscribe = FirebaseService.listenFriendState((nextState) => {
+    serverFriends = nextState;
+    if (els.modalTitle.textContent === "フレンド" && els.modalLayer.classList.contains("is-open")) {
+      els.modalBody.innerHTML = renderFriendPanel();
+    }
+  });
 }
 
 async function openProfile() {
@@ -977,6 +1041,7 @@ async function init() {
     state.friendship = Number(firebaseResult.profile.friendship ?? state.friendship);
     Store.save(state);
     renderHud();
+    startFriendRealtime();
   }
   syncProfile();
   earnTimer = setInterval(renderEarnButton, 1000);
@@ -984,6 +1049,7 @@ async function init() {
   window.addEventListener("beforeunload", () => {
     clearInterval(earnTimer);
     clearInterval(clockTimer);
+    if (friendStateUnsubscribe) friendStateUnsubscribe();
   });
 }
 
