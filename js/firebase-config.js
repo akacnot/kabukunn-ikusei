@@ -1,8 +1,9 @@
-window.KABUKUN_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBz6hfXmMXVrXdV7vlir5nrc7yFHkVscH0",
-  authDomain: "kabukunnikusei.firebaseapp.com",
-  projectId: "kabukunnikusei",
-  storageBucket: "kabukunnikusei.firebasestorage.app",
-  messagingSenderId: "432088943300",
-  appId: "1:432088943300:web:65c5d62606df2ff3505791"
+const firebaseConfig = {
+  apiKey: "AIzaSyD_kdD-STQWAQVhMHeHfXchW5e74ESrNoI",
+  authDomain: "kabukunn-28e85.firebaseapp.com",
+  projectId: "kabukunn-28e85",
+  storageBucket: "kabukunn-28e85.firebasestorage.app",
+  messagingSenderId: "161727203465",
+  appId: "1:161727203465:web:4af5fecf60c5c3da635e58",
+  measurementId: "G-WQBBEE0GEF"
 };
