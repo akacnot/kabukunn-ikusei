@@ -43,9 +43,10 @@ export async function initKabukunFirebase(localState) {
   db = getFirestore(app);
 
   currentUser = await waitForAuthUser();
-  currentProfile = await ensureProfile(localState);
+  const profileResult = await ensureProfile(localState);
+  currentProfile = profileResult.profile;
   firebaseReady = true;
-  return { available: true, user: currentUser, profile: currentProfile };
+  return { available: true, user: currentUser, profile: currentProfile, createdProfile: profileResult.created };
 }
 
 export function isFirebaseReady() {
@@ -305,10 +306,10 @@ async function ensureProfile(localState) {
       localState.friendCode = profile.playerCode;
       window.Store?.save(localState);
     }
-    return profile;
+    return { profile, created: false };
   }
 
-  return createProfile(localState);
+  return { profile: await createProfile(localState), created: true };
 }
 
 async function createProfile(localState) {
@@ -330,6 +331,8 @@ async function createProfile(localState) {
           coins: Number(localState.coins || 0),
           friendship: Number(localState.friendship || 1),
           friends: [],
+          migrationSource: "localStorage",
+          migratedFromLocalAt: serverTimestamp(),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         };

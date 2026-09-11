@@ -2,6 +2,7 @@ import * as FirebaseService from "./firebase-service.js";
 
 const { GAME_CONFIG, Store } = window;
 const state = Store.load();
+const LOCAL_MIGRATION_BACKUP_KEY = "kabukun-local-before-firebase-migration";
 
 const els = {
   screens: document.querySelectorAll(".screen"),
@@ -56,6 +57,22 @@ function persist() {
   Store.save(state);
   renderHud();
   syncProfile();
+}
+
+function backupLocalStateBeforeCloudMerge() {
+  if (localStorage.getItem(LOCAL_MIGRATION_BACKUP_KEY)) return;
+  localStorage.setItem(
+    LOCAL_MIGRATION_BACKUP_KEY,
+    JSON.stringify({
+      savedAt: new Date().toISOString(),
+      state: structuredClone(state)
+    })
+  );
+}
+
+function hasFirebaseConfig() {
+  const config = window.KABUKUN_FIREBASE_CONFIG;
+  return Boolean(config && config.apiKey !== "YOUR_API_KEY" && config.appId !== "YOUR_APP_ID");
 }
 
 function routeTo(name) {
@@ -1032,6 +1049,7 @@ async function init() {
   renderImages();
   renderHud();
   renderClock();
+  if (hasFirebaseConfig()) backupLocalStateBeforeCloudMerge();
   const firebaseResult = await FirebaseService.initKabukunFirebase(state);
   if (firebaseResult.available && firebaseResult.profile) {
     state.friendCode = firebaseResult.profile.playerCode || state.friendCode;
