@@ -10,8 +10,15 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     function validProfileCreate(uid) {
       return isOwner(uid)
+        && request.resource.data.keys().hasOnly(['uid', 'playerCode', 'nickname', 'iconId', 'coins', 'friendship', 'friends', 'migrationSource', 'migratedFromLocalAt', 'createdAt', 'updatedAt'])
         && request.resource.data.uid == uid
         && request.resource.data.playerCode is string
         && request.resource.data.playerCode.matches('^[0-9]{12}$')
@@ -28,6 +35,7 @@ service cloud.firestore {
 
     function validProfileUpdate(uid) {
       return isOwner(uid)
+        && request.resource.data.keys().hasOnly(['uid', 'playerCode', 'nickname', 'iconId', 'coins', 'friendship', 'friends', 'migrationSource', 'migratedFromLocalAt', 'createdAt', 'updatedAt', 'role'])
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.playerCode == resource.data.playerCode
         && request.resource.data.nickname is string
@@ -40,7 +48,8 @@ service cloud.firestore {
         && request.resource.data.friendship is int
         && request.resource.data.friendship >= resource.data.friendship
         && request.resource.data.friendship <= resource.data.friendship + 10
-        && request.resource.data.friends is list;
+        && request.resource.data.friends is list
+        && (!('role' in resource.data) || request.resource.data.role == resource.data.role);
     }
 
     function validFriendAcceptUpdate(uid) {
@@ -101,6 +110,45 @@ service cloud.firestore {
         && request.resource.data.status == 'approved';
 
       allow delete: if false;
+    }
+
+    match /promoCodes/{code} {
+      allow read: if signedIn();
+      allow create: if isAdmin()
+        && code.matches('^[A-Z0-9_-]{3,32}$')
+        && request.resource.data.keys().hasOnly(['label', 'rewards', 'usageLimit', 'usedCount', 'redeemedBy', 'enabled', 'createdBy', 'createdAt', 'updatedAt'])
+        && request.resource.data.label is string
+        && request.resource.data.rewards.coins is int
+        && request.resource.data.rewards.food is int
+        && request.resource.data.usageLimit is int
+        && request.resource.data.usageLimit >= 1
+        && request.resource.data.usedCount == 0
+        && request.resource.data.redeemedBy is list
+        && request.resource.data.enabled is bool
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if isAdmin()
+        || (signedIn()
+          && resource.data.enabled == true
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['usedCount', 'redeemedBy', 'updatedAt'])
+          && resource.data.usedCount < resource.data.usageLimit
+          && request.resource.data.usedCount == resource.data.usedCount + 1
+          && request.resource.data.usageLimit == resource.data.usageLimit
+          && request.resource.data.redeemedBy is list
+          && request.auth.uid in request.resource.data.redeemedBy
+          && !(request.auth.uid in resource.data.redeemedBy));
+
+      allow delete: if isAdmin();
+    }
+
+    match /promoCodeRedemptions/{redemptionId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['code', 'uid', 'rewards', 'redeemedAt'])
+        && redemptionId == request.resource.data.code + '_' + request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && exists(/databases/$(database)/documents/promoCodes/$(request.resource.data.code));
+      allow update, delete: if false;
     }
   }
 }

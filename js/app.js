@@ -379,7 +379,7 @@ function buyItem(itemId) {
   showToast(`${item.name}を買いました`);
 }
 
-function redeemGift() {
+async function redeemGift() {
   const input = document.querySelector("#giftInput");
   const code = input.value.trim().toUpperCase();
   const gift = getGiftCode(code);
@@ -387,6 +387,23 @@ function redeemGift() {
   if (!code) {
     showToast("コードを入力してください");
     return;
+  }
+  if (canUseFirebase()) {
+    try {
+      const promoGift = await FirebaseService.redeemPromoCode(code);
+      applyGiftRewards(promoGift);
+      state.redeemedGiftCodes.push(code);
+      persist();
+      input.value = "";
+      showToast(`${promoGift.label}を受け取りました`);
+      return;
+    } catch (error) {
+      if (!String(error?.message || "").includes("promo_not_found")) {
+        console.error("[Firebase] promo redeem failed in app", error);
+        showToast(getGiftErrorMessage(error));
+        return;
+      }
+    }
   }
   if (!gift) {
     showToast("コードが見つかりません");
@@ -397,14 +414,26 @@ function redeemGift() {
     return;
   }
 
-  state.coins += gift.rewards.coins || 0;
-  if (gift.rewards.food) {
-    state.foodInventory.fresh_leaf = (state.foodInventory.fresh_leaf || 0) + gift.rewards.food;
-  }
+  applyGiftRewards(gift);
   state.redeemedGiftCodes.push(code);
   persist();
   input.value = "";
   showToast(`${gift.label}を受け取りました`);
+}
+
+function applyGiftRewards(gift) {
+  state.coins += gift.rewards.coins || 0;
+  if (gift.rewards.food) {
+    state.foodInventory.fresh_leaf = (state.foodInventory.fresh_leaf || 0) + gift.rewards.food;
+  }
+}
+
+function getGiftErrorMessage(error) {
+  const message = error?.message || "";
+  if (message.includes("promo_used")) return "このコードは使用済みです";
+  if (message.includes("promo_expired")) return "このコードは期限切れです";
+  if (message.includes("promo_disabled")) return "このコードは現在使えません";
+  return "コードの受け取りに失敗しました";
 }
 
 function getGiftCode(code) {
@@ -775,6 +804,8 @@ function startSoloBattle() {
     guard: 0,
     cooldowns: {},
     lastSkillId: "",
+    lastComboGroup: "",
+    repeatPressure: 0,
     turn: 1,
     log: "ライバルかぶがあらわれた！ 技を選ぼう。"
   };
@@ -787,11 +818,14 @@ function renderBattle() {
   const rivalPercent = Math.max(0, (battle.rivalHp / GAME_CONFIG.battle.rivalMaxHp) * 100);
   const skills = GAME_CONFIG.battle.skills
     .map(
-      (skill) => `
-        <button class="skill-btn" data-battle-skill="${skill.id}" ${battle.energy < skill.cost || battle.cooldowns[skill.id] > 0 ? "disabled" : ""}>
+      (skill) => {
+        const locked = Number(state.friendship || 1) < (skill.requiredFriendship || 1);
+        return `
+        <button class="skill-btn" data-battle-skill="${skill.id}" ${locked || battle.energy < skill.cost || battle.cooldowns[skill.id] > 0 ? "disabled" : ""}>
           <strong>${skill.name}</strong>
-          <small>${skill.text} / EN ${skill.cost}${battle.cooldowns[skill.id] > 0 ? ` / あと${battle.cooldowns[skill.id]}ターン` : ""}</small>
-        </button>`
+          <small>${locked ? `なかよし${skill.requiredFriendship}で解放` : `${skill.text} / EN ${skill.cost}${battle.cooldowns[skill.id] > 0 ? ` / あと${battle.cooldowns[skill.id]}ターン` : ""}`}</small>
+        </button>`;
+      }
     )
     .join("");
 
@@ -822,8 +856,13 @@ function renderBattle() {
 function useBattleSkill(skillId) {
   if (!battle) return;
   const skill = GAME_CONFIG.battle.skills.find((item) => item.id === skillId);
+  const locked = Number(state.friendship || 1) < (skill?.requiredFriendship || 1);
   if (!skill || battle.energy < skill.cost) {
     showToast("エネルギーが足りません");
+    return;
+  }
+  if (locked) {
+    showToast("なかよしレベルが足りません");
     return;
   }
   if (battle.cooldowns[skill.id] > 0) {
@@ -839,11 +878,16 @@ function useBattleSkill(skillId) {
   battle.guard = 0;
   battle.lastSkillId = skill.id;
   battle.cooldowns[skill.id] = skill.cooldown || 1;
+  const repeatedGroup = battle.lastComboGroup === skill.comboGroup;
+  battle.repeatPressure = repeatedGroup ? battle.repeatPressure + 1 : 0;
+  battle.lastComboGroup = skill.comboGroup;
   let log = `${skill.name}！`;
   if (skill.power) {
-    const damage = randomRange(skill.power[0], skill.power[1]);
+    const pressurePenalty = Math.min(5, battle.repeatPressure * 3);
+    const damage = Math.max(1, randomRange(skill.power[0], skill.power[1]) - pressurePenalty);
     battle.rivalHp = Math.max(0, battle.rivalHp - damage);
     log += ` ${damage}ダメージ`;
+    if (pressurePenalty > 0) log += " 似た技を読まれた";
   }
   if (skill.guard) {
     battle.guard = skill.guard;
@@ -867,7 +911,8 @@ function useBattleSkill(skillId) {
 }
 
 function rivalTurn() {
-  const damage = Math.max(1, randomRange(5, 10) - battle.guard);
+  const pressureBonus = battle.repeatPressure > 0 ? battle.repeatPressure * 2 : 0;
+  const damage = Math.max(1, randomRange(6, 11) + pressureBonus - battle.guard);
   battle.playerHp = Math.max(0, battle.playerHp - damage);
   battle.energy = Math.min(GAME_CONFIG.battle.maxEnergy, battle.energy + 1);
   Object.keys(battle.cooldowns).forEach((skillId) => {

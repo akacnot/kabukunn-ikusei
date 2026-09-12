@@ -339,6 +339,62 @@ export async function approveFriendRequest(requestId) {
   return true;
 }
 
+export async function redeemPromoCode(rawCode) {
+  if (!firebaseReady || !currentUser) throw new Error("firebase_not_ready");
+  const code = String(rawCode || "").trim().toUpperCase();
+  if (!/^[A-Z0-9_-]{3,32}$/.test(code)) throw new Error("invalid_promo_code");
+
+  const promoRef = doc(db, "promoCodes", code);
+  const redemptionRef = doc(db, "promoCodeRedemptions", `${code}_${currentUser.uid}`);
+  let redeemedGift = null;
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      const [promoSnap, redemptionSnap] = await Promise.all([
+        transaction.get(promoRef),
+        transaction.get(redemptionRef)
+      ]);
+      if (!promoSnap.exists()) throw new Error("promo_not_found");
+      if (redemptionSnap.exists()) throw new Error("promo_used");
+
+      const promo = promoSnap.data();
+      const now = Date.now();
+      const expiresAtMs = promo.expiresAt?.toMillis ? promo.expiresAt.toMillis() : null;
+      if (promo.enabled === false) throw new Error("promo_disabled");
+      if (expiresAtMs && expiresAtMs < now) throw new Error("promo_expired");
+
+      const usageLimit = Number(promo.usageLimit || 1);
+      const usedCount = Number(promo.usedCount || 0);
+      if (usedCount >= usageLimit) throw new Error("promo_used");
+
+      redeemedGift = {
+        label: promo.label || "運営配布",
+        rewards: {
+          coins: Number(promo.rewards?.coins || 0),
+          food: Number(promo.rewards?.food || 0)
+        }
+      };
+
+      transaction.update(promoRef, {
+        usedCount: usedCount + 1,
+        redeemedBy: arrayUnion(currentUser.uid),
+        updatedAt: serverTimestamp()
+      });
+      transaction.set(redemptionRef, {
+        code,
+        uid: currentUser.uid,
+        rewards: redeemedGift.rewards,
+        redeemedAt: serverTimestamp()
+      });
+    });
+  } catch (error) {
+    console.error("[Firebase] promo redeem failed", error);
+    throw error;
+  }
+
+  return redeemedGift;
+}
+
 async function waitForAuthUser() {
   const existingUser = await new Promise((resolve) => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {

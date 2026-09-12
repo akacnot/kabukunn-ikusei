@@ -1,5 +1,5 @@
 window.GAME_CONFIG = {
-  appVersion: "1.10",
+  appVersion: "1.20",
 
   initialState: {
     coins: 120,
@@ -55,13 +55,15 @@ window.GAME_CONFIG = {
     winRewardCoins: 35,
     loseRewardCoins: 4,
     playerMaxHp: 42,
-    rivalMaxHp: 40,
+    rivalMaxHp: 52,
     maxEnergy: 4,
     skills: [
-      { id: "leaf_cut", name: "はっぱ斬り", cost: 1, cooldown: 1, power: [6, 10], text: "すばやく斬りつける" },
-      { id: "root_guard", name: "ねっこガード", cost: 1, cooldown: 1, guard: 7, heal: 2, text: "守りながら少し回復" },
-      { id: "sun_charge", name: "太陽チャージ", cost: 0, cooldown: 2, energy: 2, heal: 3, text: "気合いをためる" },
-      { id: "kabu_spin", name: "かぶスピン", cost: 3, cooldown: 2, power: [13, 18], text: "大ダメージの必殺技" }
+      { id: "leaf_cut", name: "はっぱ斬り", requiredFriendship: 1, comboGroup: "attack", cost: 1, cooldown: 1, power: [5, 8], text: "基本の攻撃" },
+      { id: "root_guard", name: "ねっこガード", requiredFriendship: 1, comboGroup: "guard", cost: 1, cooldown: 2, guard: 8, heal: 2, text: "守りを固める" },
+      { id: "sun_charge", name: "太陽チャージ", requiredFriendship: 2, comboGroup: "charge", cost: 0, cooldown: 3, energy: 2, heal: 2, text: "次の技に備える" },
+      { id: "leaf_storm", name: "リーフストーム", requiredFriendship: 4, comboGroup: "attack", cost: 2, cooldown: 2, power: [9, 13], text: "強めの連続攻撃" },
+      { id: "kabu_spin", name: "かぶスピン", requiredFriendship: 7, comboGroup: "special", cost: 3, cooldown: 3, power: [14, 19], text: "大ダメージの必殺技" },
+      { id: "friend_bloom", name: "なかよし開花", requiredFriendship: 10, comboGroup: "special", cost: 4, cooldown: 4, power: [18, 24], heal: 4, text: "攻撃しながら回復" }
     ]
   },
 

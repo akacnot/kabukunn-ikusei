@@ -1,3 +1,20 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInAnonymously
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  getFirestore,
+  serverTimestamp,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
 const ADMIN_STORAGE_KEY = "kabukun-admin-gifts";
 const ADMIN_MISSION_STORAGE_KEY = "kabukun-admin-missions";
 
@@ -6,15 +23,14 @@ const els = {
   giftLabel: document.querySelector("#giftLabel"),
   giftCoins: document.querySelector("#giftCoins"),
   giftFood: document.querySelector("#giftFood"),
+  giftUsageLimit: document.querySelector("#giftUsageLimit"),
   saveGift: document.querySelector("#saveGift"),
   giftList: document.querySelector("#giftList"),
   jsonOutput: document.querySelector("#jsonOutput"),
   copyJson: document.querySelector("#copyJson"),
   downloadJson: document.querySelector("#downloadJson"),
-  clearGifts: document.querySelector("#clearGifts")
-};
-
-Object.assign(els, {
+  clearGifts: document.querySelector("#clearGifts"),
+  firebaseStatus: document.querySelector("#firebaseStatus"),
   missionId: document.querySelector("#missionId"),
   missionTitle: document.querySelector("#missionTitle"),
   missionMetric: document.querySelector("#missionMetric"),
@@ -24,7 +40,13 @@ Object.assign(els, {
   missionReset: document.querySelector("#missionReset"),
   saveMission: document.querySelector("#saveMission"),
   missionList: document.querySelector("#missionList")
-});
+};
+
+let app = null;
+let auth = null;
+let db = null;
+let adminUser = null;
+let firebaseAdminReady = false;
 
 function loadGifts() {
   return JSON.parse(localStorage.getItem(ADMIN_STORAGE_KEY) || "{}");
@@ -44,8 +66,56 @@ function saveMissions(missions) {
   render();
 }
 
-function render() {
-  const gifts = loadGifts();
+async function initFirebaseAdmin() {
+  const config = window.KABUKUN_FIREBASE_CONFIG;
+  if (!config?.apiKey || config.apiKey === "YOUR_API_KEY") {
+    els.firebaseStatus.textContent = "Firebase未設定: ローカル保存のみ";
+    return;
+  }
+
+  try {
+    app = initializeApp(config);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    adminUser = await waitForAuthUser();
+    const adminSnap = await getDoc(doc(db, "users", adminUser.uid));
+    firebaseAdminReady = adminSnap.exists() && adminSnap.data().role === "admin";
+    els.firebaseStatus.textContent = firebaseAdminReady
+      ? `Firebase連携中: admin (${adminUser.uid})`
+      : `Firebase接続済み: admin権限なし (${adminUser.uid})`;
+  } catch (error) {
+    console.error("[Firebase] admin initialization failed", error);
+    els.firebaseStatus.textContent = "Firebase接続エラー: Consoleを確認してください";
+  }
+}
+
+async function waitForAuthUser() {
+  const existingUser = await new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+      resolve(user);
+    });
+  });
+  if (existingUser) return existingUser;
+  const credential = await signInAnonymously(auth);
+  return credential.user;
+}
+
+async function loadFirebasePromoCodes() {
+  if (!firebaseAdminReady) return {};
+  try {
+    const snapshot = await getDocs(collection(db, "promoCodes"));
+    return Object.fromEntries(snapshot.docs.map((item) => [item.id, item.data()]));
+  } catch (error) {
+    console.error("[Firebase] promo code load failed", error);
+    return {};
+  }
+}
+
+async function render() {
+  const localGifts = loadGifts();
+  const firebaseGifts = await loadFirebasePromoCodes();
+  const gifts = { ...localGifts, ...firebaseGifts };
   const entries = Object.entries(gifts);
   els.giftList.innerHTML = entries.length
     ? entries
@@ -54,7 +124,7 @@ function render() {
             <article class="gift-card">
               <div>
                 <strong>${code}</strong>
-                <span>${gift.label} / コイン${gift.rewards.coins || 0} / えさ${gift.rewards.food || 0}</span>
+                <span>${gift.label} / コイン${gift.rewards?.coins || 0} / えさ${gift.rewards?.food || 0} / ${gift.usedCount || 0}/${gift.usageLimit || 1}回使用</span>
               </div>
               <button data-delete-code="${code}" class="danger">削除</button>
             </article>`
@@ -83,20 +153,42 @@ function renderMissions() {
     : "<p>保存中のミッションはありません。</p>";
 }
 
-function saveGift() {
+async function saveGift() {
   const code = els.giftCode.value.trim().toUpperCase();
-  if (!code) return;
-  const gifts = loadGifts();
-  gifts[code] = {
+  if (!/^[A-Z0-9_-]{3,32}$/.test(code)) return;
+  const gift = {
     label: els.giftLabel.value.trim() || "運営配布",
     rewards: {
       coins: Number(els.giftCoins.value || 0),
       food: Number(els.giftFood.value || 0)
-    }
+    },
+    usageLimit: Math.max(1, Number(els.giftUsageLimit.value || 1)),
+    usedCount: 0,
+    redeemedBy: [],
+    enabled: true
   };
-  saveGifts(gifts);
+  const gifts = loadGifts();
+  gifts[code] = gift;
+  localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(gifts));
+
+  if (firebaseAdminReady) {
+    try {
+      await setDoc(doc(db, "promoCodes", code), {
+        ...gift,
+        createdBy: adminUser.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      els.firebaseStatus.textContent = `Firebaseへ保存しました: ${code}`;
+    } catch (error) {
+      console.error("[Firebase] promo code save failed", error);
+      els.firebaseStatus.textContent = "Firebase保存に失敗: Consoleを確認してください";
+    }
+  }
+
   els.giftCode.value = "";
   els.giftLabel.value = "";
+  render();
 }
 
 function downloadJson() {
@@ -128,13 +220,23 @@ function saveMission() {
   els.missionTitle.value = "";
 }
 
+async function deleteGift(code) {
+  const gifts = loadGifts();
+  delete gifts[code];
+  localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(gifts));
+  if (firebaseAdminReady) {
+    try {
+      await deleteDoc(doc(db, "promoCodes", code));
+    } catch (error) {
+      console.error("[Firebase] promo code delete failed", error);
+    }
+  }
+  render();
+}
+
 document.addEventListener("click", (event) => {
   const deleteButton = event.target.closest("[data-delete-code]");
-  if (deleteButton) {
-    const gifts = loadGifts();
-    delete gifts[deleteButton.dataset.deleteCode];
-    saveGifts(gifts);
-  }
+  if (deleteButton) deleteGift(deleteButton.dataset.deleteCode);
 
   const deleteMissionButton = event.target.closest("[data-delete-mission]");
   if (deleteMissionButton) {
@@ -148,4 +250,5 @@ els.copyJson.addEventListener("click", () => navigator.clipboard?.writeText(els.
 els.downloadJson.addEventListener("click", downloadJson);
 els.clearGifts.addEventListener("click", () => saveGifts({}));
 
+await initFirebaseAdmin();
 render();
