@@ -31,22 +31,33 @@ let db = null;
 let currentUser = null;
 let currentProfile = null;
 let firebaseReady = false;
+let firestoreConnectedLogged = false;
 
 export async function initKabukunFirebase(localState) {
   const config = window.KABUKUN_FIREBASE_CONFIG;
-  if (!config || config.apiKey === "YOUR_API_KEY" || config.appId === "YOUR_APP_ID") {
+  if (!isUsableFirebaseConfig(config)) {
+    console.error("[Firebase] config missing or incomplete", config);
     return { available: false, reason: "missing_config" };
   }
 
-  app = initializeApp(config);
-  auth = getAuth(app);
-  db = getFirestore(app);
+  try {
+    console.info("[Firebase] initializing");
+    app = initializeApp(config);
+    auth = getAuth(app);
+    db = getFirestore(app);
 
-  currentUser = await waitForAuthUser();
-  const profileResult = await ensureProfile(localState);
-  currentProfile = profileResult.profile;
-  firebaseReady = true;
-  return { available: true, user: currentUser, profile: currentProfile, createdProfile: profileResult.created };
+    currentUser = await waitForAuthUser();
+    console.info("[Firebase] auth signed in");
+    console.info("[Firebase] migration start");
+    const profileResult = await ensureProfile(localState);
+    currentProfile = profileResult.profile;
+    firebaseReady = true;
+    console.info("[Firebase] migration completed");
+    return { available: true, user: currentUser, profile: currentProfile, createdProfile: profileResult.created };
+  } catch (error) {
+    console.error("[Firebase] initialization failed", error);
+    throw error;
+  }
 }
 
 export function isFirebaseReady() {
@@ -71,7 +82,12 @@ export async function syncProfile(localState) {
     iconId: localState.iconId || currentProfile?.iconId || "kabukun_01",
     updatedAt: serverTimestamp()
   };
-  await setDoc(doc(db, "users", currentUser.uid), profilePatch, { merge: true });
+  try {
+    await setDoc(doc(db, "users", currentUser.uid), profilePatch, { merge: true });
+  } catch (error) {
+    console.error("[Firebase] profile sync failed", error);
+    throw error;
+  }
   currentProfile = { ...currentProfile, ...profilePatch };
   return currentProfile;
 }
@@ -82,48 +98,58 @@ export async function updateProfile({ nickname, iconId }) {
   if (cleanName.length < 1 || cleanName.length > 12) throw new Error("invalid_nickname");
   if (!/^[a-z0-9_]+$/i.test(iconId || "")) throw new Error("invalid_icon");
 
-  await updateDoc(doc(db, "users", currentUser.uid), {
-    nickname: cleanName,
-    iconId,
-    updatedAt: serverTimestamp()
-  });
+  try {
+    await updateDoc(doc(db, "users", currentUser.uid), {
+      nickname: cleanName,
+      iconId,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error("[Firebase] profile update failed", error);
+    throw error;
+  }
   currentProfile = { ...currentProfile, nickname: cleanName, iconId };
   return currentProfile;
 }
 
 export async function getFriendState() {
   if (!firebaseReady || !currentUser) return null;
-  const profileSnap = await getDoc(doc(db, "users", currentUser.uid));
-  const profile = profileSnap.data();
-  const friendUids = profile?.friends || [];
-  const friends = [];
+  try {
+    const profileSnap = await getDoc(doc(db, "users", currentUser.uid));
+    const profile = profileSnap.data();
+    const friendUids = profile?.friends || [];
+    const friends = [];
 
-  for (const uid of friendUids) {
-    const friendSnap = await getDoc(doc(db, "users", uid));
-    if (friendSnap.exists()) friends.push(publicProfile(friendSnap.data()));
+    for (const uid of friendUids) {
+      const friendSnap = await getDoc(doc(db, "users", uid));
+      if (friendSnap.exists()) friends.push(publicProfile(friendSnap.data()));
+    }
+
+    const incomingSnap = await getDocs(
+      query(
+        collection(db, "friendRequests"),
+        where("toUid", "==", currentUser.uid),
+        where("status", "==", REQUEST_STATUS.pending)
+      )
+    );
+    const outgoingSnap = await getDocs(
+      query(
+        collection(db, "friendRequests"),
+        where("fromUid", "==", currentUser.uid),
+        where("status", "==", REQUEST_STATUS.pending)
+      )
+    );
+
+    return {
+      profile: publicProfile(profile),
+      friends,
+      incoming: incomingSnap.docs.map((item) => ({ id: item.id, ...item.data() })),
+      outgoing: outgoingSnap.docs.map((item) => ({ id: item.id, ...item.data() }))
+    };
+  } catch (error) {
+    console.error("[Firebase] friend state load failed", error);
+    throw error;
   }
-
-  const incomingSnap = await getDocs(
-    query(
-      collection(db, "friendRequests"),
-      where("toUid", "==", currentUser.uid),
-      where("status", "==", REQUEST_STATUS.pending)
-    )
-  );
-  const outgoingSnap = await getDocs(
-    query(
-      collection(db, "friendRequests"),
-      where("fromUid", "==", currentUser.uid),
-      where("status", "==", REQUEST_STATUS.pending)
-    )
-  );
-
-  return {
-    profile: publicProfile(profile),
-    friends,
-    incoming: incomingSnap.docs.map((item) => ({ id: item.id, ...item.data() })),
-    outgoing: outgoingSnap.docs.map((item) => ({ id: item.id, ...item.data() }))
-  };
 }
 
 export function listenFriendState(onChange) {
@@ -158,26 +184,38 @@ export function listenFriendState(onChange) {
 
     nextUids.forEach((uid) => {
       if (uid === currentUser.uid || friendUnsubscribers.has(uid)) return;
-      const unsubscribe = onSnapshot(doc(db, "users", uid), (snapshot) => {
-        if (snapshot.exists()) {
-          friendProfiles.set(uid, publicProfile(snapshot.data()));
-        } else {
-          friendProfiles.delete(uid);
+      const unsubscribe = onSnapshot(
+        doc(db, "users", uid),
+        (snapshot) => {
+          if (snapshot.exists()) {
+            friendProfiles.set(uid, publicProfile(snapshot.data()));
+          } else {
+            friendProfiles.delete(uid);
+          }
+          emit();
+        },
+        (error) => {
+          console.error("[Firebase] friend profile listener failed", error);
         }
-        emit();
-      });
+      );
       friendUnsubscribers.set(uid, unsubscribe);
     });
   };
 
   unsubscribers.push(
-    onSnapshot(doc(db, "users", currentUser.uid), (snapshot) => {
-      if (!snapshot.exists()) return;
-      profile = snapshot.data();
-      currentProfile = profile;
-      syncFriendProfileListeners(profile.friends || []);
-      emit();
-    })
+    onSnapshot(
+      doc(db, "users", currentUser.uid),
+      (snapshot) => {
+        if (!snapshot.exists()) return;
+        profile = snapshot.data();
+        currentProfile = profile;
+        syncFriendProfileListeners(profile.friends || []);
+        emit();
+      },
+      (error) => {
+        console.error("[Firebase] own profile listener failed", error);
+      }
+    )
   );
 
   unsubscribers.push(
@@ -186,6 +224,9 @@ export function listenFriendState(onChange) {
       (snapshot) => {
         incoming = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
         emit();
+      },
+      (error) => {
+        console.error("[Firebase] incoming request listener failed", error);
       }
     )
   );
@@ -196,6 +237,9 @@ export function listenFriendState(onChange) {
       (snapshot) => {
         outgoing = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
         emit();
+      },
+      (error) => {
+        console.error("[Firebase] outgoing request listener failed", error);
       }
     )
   );
@@ -217,41 +261,46 @@ export async function sendFriendRequestByCode(targetCode) {
   const requestId = `${currentUser.uid}_${targetUid}`;
   const reverseRequestId = `${targetUid}_${currentUser.uid}`;
 
-  await runTransaction(db, async (transaction) => {
-    const meRef = doc(db, "users", currentUser.uid);
-    const targetRef = doc(db, "users", targetUid);
-    const requestRef = doc(db, "friendRequests", requestId);
-    const reverseRequestRef = doc(db, "friendRequests", reverseRequestId);
-    const [meSnap, targetSnap, requestSnap, reverseRequestSnap] = await Promise.all([
-      transaction.get(meRef),
-      transaction.get(targetRef),
-      transaction.get(requestRef),
-      transaction.get(reverseRequestRef)
-    ]);
-    const me = meSnap.data();
-    const target = targetSnap.data();
-    if (!me || !target) throw new Error("profile_missing");
-    if ((me.friends || []).includes(targetUid) || (target.friends || []).includes(currentUser.uid)) {
-      throw new Error("already_friend");
-    }
-    if (requestSnap.exists() && requestSnap.data().status === REQUEST_STATUS.pending) {
-      throw new Error("duplicate_request");
-    }
-    if (reverseRequestSnap.exists() && reverseRequestSnap.data().status === REQUEST_STATUS.pending) {
-      throw new Error("duplicate_request");
-    }
-    transaction.set(requestRef, {
-      fromUid: currentUser.uid,
-      fromCode: me.playerCode,
-      fromNickname: me.nickname || "かぶくん",
-      fromIconId: me.iconId || "kabukun_01",
-      toUid: targetUid,
-      toCode: target.playerCode,
-      status: REQUEST_STATUS.pending,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+  try {
+    await runTransaction(db, async (transaction) => {
+      const meRef = doc(db, "users", currentUser.uid);
+      const targetRef = doc(db, "users", targetUid);
+      const requestRef = doc(db, "friendRequests", requestId);
+      const reverseRequestRef = doc(db, "friendRequests", reverseRequestId);
+      const [meSnap, targetSnap, requestSnap, reverseRequestSnap] = await Promise.all([
+        transaction.get(meRef),
+        transaction.get(targetRef),
+        transaction.get(requestRef),
+        transaction.get(reverseRequestRef)
+      ]);
+      const me = meSnap.data();
+      const target = targetSnap.data();
+      if (!me || !target) throw new Error("profile_missing");
+      if ((me.friends || []).includes(targetUid) || (target.friends || []).includes(currentUser.uid)) {
+        throw new Error("already_friend");
+      }
+      if (requestSnap.exists() && requestSnap.data().status === REQUEST_STATUS.pending) {
+        throw new Error("duplicate_request");
+      }
+      if (reverseRequestSnap.exists() && reverseRequestSnap.data().status === REQUEST_STATUS.pending) {
+        throw new Error("duplicate_request");
+      }
+      transaction.set(requestRef, {
+        fromUid: currentUser.uid,
+        fromCode: me.playerCode,
+        fromNickname: me.nickname || "かぶくん",
+        fromIconId: me.iconId || "kabukun_01",
+        toUid: targetUid,
+        toCode: target.playerCode,
+        status: REQUEST_STATUS.pending,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
     });
-  });
+  } catch (error) {
+    console.error("[Firebase] friend request failed", error);
+    throw error;
+  }
 
   return true;
 }
@@ -259,28 +308,33 @@ export async function sendFriendRequestByCode(targetCode) {
 export async function approveFriendRequest(requestId) {
   if (!firebaseReady || !currentUser) throw new Error("firebase_not_ready");
 
-  await runTransaction(db, async (transaction) => {
-    const requestRef = doc(db, "friendRequests", requestId);
-    const requestSnap = await transaction.get(requestRef);
-    if (!requestSnap.exists()) throw new Error("request_missing");
-    const request = requestSnap.data();
-    if (request.toUid !== currentUser.uid) throw new Error("not_owner");
-    if (request.fromUid === currentUser.uid) throw new Error("invalid_request");
-    if (request.status !== REQUEST_STATUS.pending) throw new Error("not_pending");
+  try {
+    await runTransaction(db, async (transaction) => {
+      const requestRef = doc(db, "friendRequests", requestId);
+      const requestSnap = await transaction.get(requestRef);
+      if (!requestSnap.exists()) throw new Error("request_missing");
+      const request = requestSnap.data();
+      if (request.toUid !== currentUser.uid) throw new Error("not_owner");
+      if (request.fromUid === currentUser.uid) throw new Error("invalid_request");
+      if (request.status !== REQUEST_STATUS.pending) throw new Error("not_pending");
 
-    transaction.update(doc(db, "users", currentUser.uid), {
-      friends: arrayUnion(request.fromUid),
-      updatedAt: serverTimestamp()
+      transaction.update(doc(db, "users", currentUser.uid), {
+        friends: arrayUnion(request.fromUid),
+        updatedAt: serverTimestamp()
+      });
+      transaction.update(doc(db, "users", request.fromUid), {
+        friends: arrayUnion(currentUser.uid),
+        updatedAt: serverTimestamp()
+      });
+      transaction.update(requestRef, {
+        status: REQUEST_STATUS.approved,
+        updatedAt: serverTimestamp()
+      });
     });
-    transaction.update(doc(db, "users", request.fromUid), {
-      friends: arrayUnion(currentUser.uid),
-      updatedAt: serverTimestamp()
-    });
-    transaction.update(requestRef, {
-      status: REQUEST_STATUS.approved,
-      updatedAt: serverTimestamp()
-    });
-  });
+  } catch (error) {
+    console.error("[Firebase] friend request approve failed", error);
+    throw error;
+  }
 
   return true;
 }
@@ -293,13 +347,19 @@ async function waitForAuthUser() {
     });
   });
   if (existingUser) return existingUser;
-  const credential = await signInAnonymously(auth);
-  return credential.user;
+  try {
+    const credential = await signInAnonymously(auth);
+    return credential.user;
+  } catch (error) {
+    console.error("[Firebase] anonymous sign in failed", error);
+    throw error;
+  }
 }
 
 async function ensureProfile(localState) {
   const userRef = doc(db, "users", currentUser.uid);
   const userSnap = await getDoc(userRef);
+  logFirestoreConnected();
   if (userSnap.exists()) {
     const profile = userSnap.data();
     if (profile.playerCode && profile.playerCode !== localState.friendCode) {
@@ -310,6 +370,28 @@ async function ensureProfile(localState) {
   }
 
   return { profile: await createProfile(localState), created: true };
+}
+
+function isUsableFirebaseConfig(config) {
+  return Boolean(
+    config &&
+      typeof config.apiKey === "string" &&
+      config.apiKey.trim() &&
+      config.apiKey !== "YOUR_API_KEY" &&
+      typeof config.projectId === "string" &&
+      config.projectId.trim() &&
+      typeof config.appId === "string" &&
+      config.appId.trim() &&
+      config.appId !== "YOUR_APP_ID" &&
+      typeof config.authDomain === "string" &&
+      config.authDomain.trim()
+  );
+}
+
+function logFirestoreConnected() {
+  if (firestoreConnectedLogged) return;
+  firestoreConnectedLogged = true;
+  console.info("[Firebase] firestore connected");
 }
 
 async function createProfile(localState) {

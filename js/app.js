@@ -48,7 +48,8 @@ function canUseFirebase() {
 async function syncProfile() {
   try {
     await FirebaseService.syncProfile(state);
-  } catch {
+  } catch (error) {
+    console.error("[Firebase] profile sync failed in app", error);
     // Firebase設定前でもローカルセーブは動くようにします。
   }
 }
@@ -500,7 +501,8 @@ async function loadServerFriends() {
   if (!canUseFirebase()) return null;
   try {
     return await FirebaseService.getFriendState();
-  } catch {
+  } catch (error) {
+    console.error("[Firebase] friend state load failed in app", error);
     return null;
   }
 }
@@ -551,6 +553,7 @@ async function sendFriendRequest() {
       if (els.modalTitle.textContent === "フレンド") els.modalBody.innerHTML = renderFriendPanel();
       showToast("フレンド申請を送りました");
     } catch (error) {
+      console.error("[Firebase] friend request failed in app", error);
       showToast(getFriendErrorMessage(error));
     }
     return;
@@ -570,7 +573,8 @@ async function approveFriend(identifier, source = "local", friendCode = identifi
       if (els.modalTitle.textContent === "フレンド") els.modalBody.innerHTML = renderFriendPanel();
       showToast("フレンドになりました");
       return;
-    } catch {
+    } catch (error) {
+      console.error("[Firebase] friend approve failed in app", error);
       showToast("Firebase承認に失敗しました");
       return;
     }
@@ -652,7 +656,8 @@ async function saveProfile() {
   try {
     await FirebaseService.updateProfile({ nickname, iconId });
     showToast("プロフィールを保存しました");
-  } catch {
+  } catch (error) {
+    console.error("[Firebase] profile save failed in app", error);
     showToast("ローカルに保存しました");
   }
   openProfile();
@@ -1050,16 +1055,20 @@ async function init() {
   renderHud();
   renderClock();
   if (hasFirebaseConfig()) backupLocalStateBeforeCloudMerge();
-  const firebaseResult = await FirebaseService.initKabukunFirebase(state);
-  if (firebaseResult.available && firebaseResult.profile) {
-    state.friendCode = firebaseResult.profile.playerCode || state.friendCode;
-    state.nickname = firebaseResult.profile.nickname || state.nickname;
-    state.iconId = firebaseResult.profile.iconId || state.iconId;
-    state.coins = Number(firebaseResult.profile.coins ?? state.coins);
-    state.friendship = Number(firebaseResult.profile.friendship ?? state.friendship);
-    Store.save(state);
-    renderHud();
-    startFriendRealtime();
+  try {
+    const firebaseResult = await FirebaseService.initKabukunFirebase(state);
+    if (firebaseResult.available && firebaseResult.profile) {
+      state.friendCode = firebaseResult.profile.playerCode || state.friendCode;
+      state.nickname = firebaseResult.profile.nickname || state.nickname;
+      state.iconId = firebaseResult.profile.iconId || state.iconId;
+      state.coins = Number(firebaseResult.profile.coins ?? state.coins);
+      state.friendship = Number(firebaseResult.profile.friendship ?? state.friendship);
+      Store.save(state);
+      renderHud();
+      startFriendRealtime();
+    }
+  } catch (error) {
+    console.error("[Firebase] app initialization failed", error);
   }
   syncProfile();
   earnTimer = setInterval(renderEarnButton, 1000);
