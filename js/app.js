@@ -95,13 +95,25 @@ function renderImages() {
 }
 
 function getIconSrc(iconId) {
-  if (iconId === "custom_photo" && state.customKabuImage) return state.customKabuImage;
+  if (iconId === "custom_photo" && (state.profilePhotoDataUrl || state.customKabuImage)) {
+    return state.profilePhotoDataUrl || state.customKabuImage;
+  }
   const icons = {
     kabukun_01: GAME_CONFIG.images.kabukun,
     kabukun_02: GAME_CONFIG.images.foodIcon,
     kabukun_03: GAME_CONFIG.images.coinIcon
   };
   return icons[iconId] || icons.kabukun_01;
+}
+
+function getProfileIconSrc(profile) {
+  if (profile?.iconId === "custom_photo") {
+    if (profile.profilePhotoDataUrl) return profile.profilePhotoDataUrl;
+    if (profile.uid === FirebaseService.getCurrentUid() && (state.profilePhotoDataUrl || state.customKabuImage)) {
+      return state.profilePhotoDataUrl || state.customKabuImage;
+    }
+  }
+  return getIconSrc(profile?.iconId || "kabukun_01");
 }
 
 function renderHud() {
@@ -296,21 +308,52 @@ function playHappyMotion() {
   els.kabukunButton.classList.add("is-happy");
 }
 
-function choosePhoto(file) {
+async function choosePhoto(file) {
   if (!file || !file.type.startsWith("image/")) {
     showToast("画像ファイルを選んでください");
     return;
   }
 
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     state.customKabuImage = reader.result;
+    try {
+      state.profilePhotoDataUrl = await createProfilePhotoThumbnail(file);
+    } catch (error) {
+      console.error("[Profile] photo thumbnail failed", error);
+      state.profilePhotoDataUrl = "";
+    }
     if (!state.iconId || state.iconId === "kabukun_01") state.iconId = "custom_photo";
     persist();
     renderImages();
     showToast("写真を設定しました");
   };
   reader.readAsDataURL(file);
+}
+
+function createProfilePhotoThumbnail(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+    image.onload = () => {
+      const size = 180;
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+      const sourceSize = Math.min(image.naturalWidth, image.naturalHeight);
+      const sourceX = (image.naturalWidth - sourceSize) / 2;
+      const sourceY = (image.naturalHeight - sourceSize) / 2;
+      canvas.width = size;
+      canvas.height = size;
+      context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.72));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("thumbnail_failed"));
+    };
+    image.src = url;
+  });
 }
 
 function openModal(title, bodyHtml) {
@@ -456,6 +499,7 @@ function renderFriendPanel() {
         code: request.fromCode,
         nickname: request.fromNickname,
         iconId: request.fromIconId,
+        profilePhotoDataUrl: request.fromProfilePhotoDataUrl,
         source: "firebase"
       }))
     : [];
@@ -473,6 +517,7 @@ function renderFriendPanel() {
         .map(
           (request) => `
             <article class="friend-row">
+              <img class="friend-row-icon" src="${getProfileIconSrc(request)}" alt="" />
               <div><strong>${request.nickname || request.code}</strong><small>${request.code} / 受信した申請</small></div>
               <button class="claim-btn" data-approve-friend="${request.id}" data-approve-code="${request.code}" data-approve-source="${request.source}">承認</button>
             </article>`
@@ -497,7 +542,7 @@ function renderFriendPanel() {
         .map(
           (friend) => `
             <article class="friend-card">
-              <img class="profile-icon" src="${getIconSrc(friend.iconId)}" alt="" />
+              <img class="profile-icon" src="${getProfileIconSrc(friend)}" alt="" />
               <strong>${friend.nickname || friend.code}</strong>
               <small>${friend.code || friend.playerCode}</small>
               <div>
@@ -651,7 +696,7 @@ async function openProfile() {
   openModal("プロフィール", `
     <section class="profile-panel">
       <div class="profile-card">
-        <img class="profile-icon" src="${getIconSrc(iconId)}" alt="" />
+        <img class="profile-icon" src="${getProfileIconSrc({ uid: FirebaseService.getCurrentUid(), iconId, profilePhotoDataUrl: state.profilePhotoDataUrl })}" alt="" />
         <h3>${nickname}</h3>
         <small>${state.friendCode}</small>
         <div class="profile-stats">
@@ -688,7 +733,7 @@ async function saveProfile() {
   state.iconId = iconId;
   Store.save(state);
   try {
-    await FirebaseService.updateProfile({ nickname, iconId });
+    await FirebaseService.updateProfile({ nickname, iconId, profilePhotoDataUrl: state.profilePhotoDataUrl || "" });
     showToast("プロフィールを保存しました");
   } catch (error) {
     console.error("[Firebase] profile save failed in app", error);
@@ -819,9 +864,9 @@ function getBattleStageInfo(stage) {
   const level = Math.min(GAME_CONFIG.battle.stageCount, Math.max(1, Number(stage) || 1));
   return {
     level,
-    playerHp: GAME_CONFIG.battle.playerMaxHp + Math.floor(Number(state.friendship || 1) * 1.5) + Math.floor(level / 2),
-    rivalHp: GAME_CONFIG.battle.rivalMaxHp + Math.floor(level * 3.2),
-    rivalDamage: [6 + Math.floor(level / 8), 11 + Math.floor(level / 5)],
+    playerHp: GAME_CONFIG.battle.playerMaxHp + Math.floor(Number(state.friendship || 1) * 2) + Math.floor(level / 3),
+    rivalHp: GAME_CONFIG.battle.rivalMaxHp + Math.floor(level * 2.1),
+    rivalDamage: [3 + Math.floor(level / 12), 6 + Math.floor(level / 7)],
     reward: GAME_CONFIG.battle.winRewardCoins + Math.floor(level * 1.8)
   };
 }
@@ -843,7 +888,7 @@ function startSoloBattle(stage = getCurrentBattleStage()) {
     reward: stageInfo.reward,
     playerHp: stageInfo.playerHp,
     rivalHp: stageInfo.rivalHp,
-    energy: 2,
+    energy: 3,
     guard: 0,
     cooldowns: {},
     lastSkillId: "",
@@ -1170,7 +1215,8 @@ async function init() {
     if (firebaseResult.available && firebaseResult.profile) {
       state.friendCode = firebaseResult.profile.playerCode || state.friendCode;
       state.nickname = firebaseResult.profile.nickname || state.nickname;
-      state.iconId = firebaseResult.profile.iconId || state.iconId;
+    state.iconId = firebaseResult.profile.iconId || state.iconId;
+    state.profilePhotoDataUrl = firebaseResult.profile.profilePhotoDataUrl || state.profilePhotoDataUrl || "";
       state.coins = Number(firebaseResult.profile.coins ?? state.coins);
       state.friendship = Number(firebaseResult.profile.friendship ?? state.friendship);
       Store.save(state);

@@ -26,9 +26,25 @@ service cloud.firestore {
           || requestId.matches('^[A-Za-z0-9_-]+_' + request.auth.uid + '$'));
     }
 
+    function validProfilePhoto(data) {
+      return !('profilePhotoDataUrl' in data)
+        || (data.profilePhotoDataUrl is string
+          && data.profilePhotoDataUrl.size() <= 250000
+          && (data.profilePhotoDataUrl == ''
+            || data.profilePhotoDataUrl.matches('^data:image/(png|jpeg|webp);base64,.+')));
+    }
+
+    function validFriendRequestPhoto(data) {
+      return !('fromProfilePhotoDataUrl' in data)
+        || (data.fromProfilePhotoDataUrl is string
+          && data.fromProfilePhotoDataUrl.size() <= 250000
+          && (data.fromProfilePhotoDataUrl == ''
+            || data.fromProfilePhotoDataUrl.matches('^data:image/(png|jpeg|webp);base64,.+')));
+    }
+
     function validProfileCreate(uid) {
       return isOwner(uid)
-        && request.resource.data.keys().hasOnly(['uid', 'playerCode', 'nickname', 'iconId', 'coins', 'friendship', 'friends', 'migrationSource', 'migratedFromLocalAt', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['uid', 'playerCode', 'nickname', 'iconId', 'profilePhotoDataUrl', 'coins', 'friendship', 'friends', 'migrationSource', 'migratedFromLocalAt', 'createdAt', 'updatedAt'])
         && request.resource.data.uid == uid
         && request.resource.data.playerCode is string
         && request.resource.data.playerCode.matches('^[0-9]{12}$')
@@ -36,6 +52,7 @@ service cloud.firestore {
         && request.resource.data.nickname.size() >= 1
         && request.resource.data.nickname.size() <= 12
         && request.resource.data.iconId is string
+        && validProfilePhoto(request.resource.data)
         && request.resource.data.coins is int
         && request.resource.data.coins >= 0
         && request.resource.data.friendship is int
@@ -45,13 +62,14 @@ service cloud.firestore {
 
     function validProfileUpdate(uid) {
       return isOwner(uid)
-        && request.resource.data.keys().hasOnly(['uid', 'playerCode', 'nickname', 'iconId', 'coins', 'friendship', 'friends', 'migrationSource', 'migratedFromLocalAt', 'createdAt', 'updatedAt', 'role'])
+        && request.resource.data.keys().hasOnly(['uid', 'playerCode', 'nickname', 'iconId', 'profilePhotoDataUrl', 'coins', 'friendship', 'friends', 'migrationSource', 'migratedFromLocalAt', 'createdAt', 'updatedAt', 'role'])
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.playerCode == resource.data.playerCode
         && request.resource.data.nickname is string
         && request.resource.data.nickname.size() >= 1
         && request.resource.data.nickname.size() <= 12
         && request.resource.data.iconId is string
+        && validProfilePhoto(request.resource.data)
         && request.resource.data.coins is int
         && request.resource.data.coins >= 0
         && request.resource.data.coins <= resource.data.coins + 100
@@ -96,7 +114,7 @@ service cloud.firestore {
 
       allow create: if signedIn()
         && requestId == request.auth.uid + '_' + request.resource.data.toUid
-        && request.resource.data.keys().hasOnly(['fromUid', 'fromCode', 'fromNickname', 'fromIconId', 'toUid', 'toCode', 'status', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['fromUid', 'fromCode', 'fromNickname', 'fromIconId', 'fromProfilePhotoDataUrl', 'toUid', 'toCode', 'status', 'createdAt', 'updatedAt'])
         && request.resource.data.fromUid == request.auth.uid
         && request.resource.data.toUid is string
         && request.resource.data.toUid != request.auth.uid
@@ -104,6 +122,7 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/users/$(request.resource.data.toUid))
         && request.resource.data.status == 'pending'
         && request.resource.data.fromCode is string
+        && validFriendRequestPhoto(request.resource.data)
         && request.resource.data.fromCode.matches('^[0-9]{12}$')
         && request.resource.data.toCode is string
         && request.resource.data.toCode.matches('^[0-9]{12}$')

@@ -1142,12 +1142,25 @@ button:active {
 .friend-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
   padding: 12px;
   border-radius: 16px;
   background: #fff;
   box-shadow: 0 8px 18px rgba(33, 72, 61, 0.08);
+}
+
+.friend-row > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.friend-row-icon {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #f4fff4;
 }
 
 .friend-row strong,

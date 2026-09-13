@@ -24,6 +24,7 @@ window.GAME_CONFIG = {
     friendRequests: [],
     friends: [],
     customKabuImage: "",
+    profilePhotoDataUrl: "",
     claimedMissions: [],
     redeemedGiftCodes: []
   },
@@ -55,13 +56,13 @@ window.GAME_CONFIG = {
   battle: {
     winRewardCoins: 35,
     loseRewardCoins: 4,
-    playerMaxHp: 42,
-    rivalMaxHp: 52,
-    maxEnergy: 4,
+    playerMaxHp: 56,
+    rivalMaxHp: 28,
+    maxEnergy: 5,
     stageCount: 50,
     skills: [
-      { id: "leaf_cut", name: "はっぱ斬り", requiredStage: 1, requiredFriendship: 1, comboGroup: "attack", cost: 1, cooldown: 1, power: [5, 8], text: "基本の攻撃" },
-      { id: "root_guard", name: "ねっこガード", requiredStage: 1, requiredFriendship: 1, comboGroup: "guard", cost: 1, cooldown: 2, guard: 8, heal: 2, text: "守りを固める" },
+      { id: "leaf_cut", name: "はっぱ斬り", requiredStage: 1, requiredFriendship: 1, comboGroup: "attack", cost: 1, cooldown: 1, power: [8, 12], text: "基本の攻撃" },
+      { id: "root_guard", name: "ねっこガード", requiredStage: 1, requiredFriendship: 1, comboGroup: "guard", cost: 1, cooldown: 2, guard: 10, heal: 4, text: "守りを固める" },
       { id: "sun_charge", name: "太陽チャージ", requiredStage: 2, requiredFriendship: 2, comboGroup: "charge", cost: 0, cooldown: 3, energy: 2, heal: 2, text: "次の技に備える" },
       { id: "seed_shot", name: "たねショット", requiredStage: 4, requiredFriendship: 3, comboGroup: "attack", cost: 1, cooldown: 2, power: [7, 11], text: "低燃費の遠距離技" },
       { id: "leaf_storm", name: "リーフストーム", requiredStage: 7, requiredFriendship: 4, comboGroup: "attack", cost: 2, cooldown: 2, power: [9, 13], text: "強めの連続攻撃" },

@@ -80,6 +80,7 @@ export async function syncProfile(localState) {
     playerCode: localState.friendCode,
     nickname: localState.nickname || currentProfile?.nickname || "かぶくん",
     iconId: localState.iconId || currentProfile?.iconId || "kabukun_01",
+    profilePhotoDataUrl: localState.profilePhotoDataUrl || currentProfile?.profilePhotoDataUrl || "",
     updatedAt: serverTimestamp()
   };
   try {
@@ -92,23 +93,27 @@ export async function syncProfile(localState) {
   return currentProfile;
 }
 
-export async function updateProfile({ nickname, iconId }) {
+export async function updateProfile({ nickname, iconId, profilePhotoDataUrl = "" }) {
   if (!firebaseReady || !currentUser) throw new Error("firebase_not_ready");
   const cleanName = String(nickname || "").trim();
   if (cleanName.length < 1 || cleanName.length > 12) throw new Error("invalid_nickname");
   if (!/^[a-z0-9_]+$/i.test(iconId || "")) throw new Error("invalid_icon");
+  if (profilePhotoDataUrl && !/^data:image\/(png|jpeg|webp);base64,/.test(profilePhotoDataUrl)) {
+    throw new Error("invalid_profile_photo");
+  }
 
   try {
     await updateDoc(doc(db, "users", currentUser.uid), {
       nickname: cleanName,
       iconId,
+      profilePhotoDataUrl,
       updatedAt: serverTimestamp()
     });
   } catch (error) {
     console.error("[Firebase] profile update failed", error);
     throw error;
   }
-  currentProfile = { ...currentProfile, nickname: cleanName, iconId };
+  currentProfile = { ...currentProfile, nickname: cleanName, iconId, profilePhotoDataUrl };
   return currentProfile;
 }
 
@@ -290,6 +295,7 @@ export async function sendFriendRequestByCode(targetCode) {
         fromCode: me.playerCode,
         fromNickname: me.nickname || "かぶくん",
         fromIconId: me.iconId || "kabukun_01",
+        fromProfilePhotoDataUrl: me.profilePhotoDataUrl || "",
         toUid: targetUid,
         toCode: target.playerCode,
         status: REQUEST_STATUS.pending,
@@ -466,6 +472,7 @@ async function createProfile(localState) {
           playerCode,
           nickname: localState.nickname || "かぶくん",
           iconId: localState.iconId || "kabukun_01",
+          profilePhotoDataUrl: localState.profilePhotoDataUrl || "",
           coins: Number(localState.coins || 0),
           friendship: Number(localState.friendship || 1),
           friends: [],
@@ -502,6 +509,7 @@ function publicProfile(profile) {
     playerCode: profile.playerCode,
     nickname: profile.nickname || "かぶくん",
     iconId: profile.iconId || "kabukun_01",
+    profilePhotoDataUrl: profile.profilePhotoDataUrl || "",
     coins: Number(profile.coins || 0),
     friendship: Number(profile.friendship || 1),
     friendCount: Array.isArray(profile.friends) ? profile.friends.length : 0
