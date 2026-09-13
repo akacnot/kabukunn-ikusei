@@ -13,6 +13,7 @@ window.GAME_CONFIG = {
     minigameCoins: 0,
     minigamePlays: 0,
     battleWins: 0,
+    battleStage: 1,
     daily: {},
     dailyClaimedMissions: {},
     lastEarnedAt: 0,
@@ -57,13 +58,18 @@ window.GAME_CONFIG = {
     playerMaxHp: 42,
     rivalMaxHp: 52,
     maxEnergy: 4,
+    stageCount: 50,
     skills: [
-      { id: "leaf_cut", name: "はっぱ斬り", requiredFriendship: 1, comboGroup: "attack", cost: 1, cooldown: 1, power: [5, 8], text: "基本の攻撃" },
-      { id: "root_guard", name: "ねっこガード", requiredFriendship: 1, comboGroup: "guard", cost: 1, cooldown: 2, guard: 8, heal: 2, text: "守りを固める" },
-      { id: "sun_charge", name: "太陽チャージ", requiredFriendship: 2, comboGroup: "charge", cost: 0, cooldown: 3, energy: 2, heal: 2, text: "次の技に備える" },
-      { id: "leaf_storm", name: "リーフストーム", requiredFriendship: 4, comboGroup: "attack", cost: 2, cooldown: 2, power: [9, 13], text: "強めの連続攻撃" },
-      { id: "kabu_spin", name: "かぶスピン", requiredFriendship: 7, comboGroup: "special", cost: 3, cooldown: 3, power: [14, 19], text: "大ダメージの必殺技" },
-      { id: "friend_bloom", name: "なかよし開花", requiredFriendship: 10, comboGroup: "special", cost: 4, cooldown: 4, power: [18, 24], heal: 4, text: "攻撃しながら回復" }
+      { id: "leaf_cut", name: "はっぱ斬り", requiredStage: 1, requiredFriendship: 1, comboGroup: "attack", cost: 1, cooldown: 1, power: [5, 8], text: "基本の攻撃" },
+      { id: "root_guard", name: "ねっこガード", requiredStage: 1, requiredFriendship: 1, comboGroup: "guard", cost: 1, cooldown: 2, guard: 8, heal: 2, text: "守りを固める" },
+      { id: "sun_charge", name: "太陽チャージ", requiredStage: 2, requiredFriendship: 2, comboGroup: "charge", cost: 0, cooldown: 3, energy: 2, heal: 2, text: "次の技に備える" },
+      { id: "seed_shot", name: "たねショット", requiredStage: 4, requiredFriendship: 3, comboGroup: "attack", cost: 1, cooldown: 2, power: [7, 11], text: "低燃費の遠距離技" },
+      { id: "leaf_storm", name: "リーフストーム", requiredStage: 7, requiredFriendship: 4, comboGroup: "attack", cost: 2, cooldown: 2, power: [9, 13], text: "強めの連続攻撃" },
+      { id: "sweet_recover", name: "あまい休息", requiredStage: 10, requiredFriendship: 5, comboGroup: "heal", cost: 2, cooldown: 4, heal: 10, energy: 1, text: "大きく回復" },
+      { id: "kabu_spin", name: "かぶスピン", requiredStage: 14, requiredFriendship: 7, comboGroup: "special", cost: 3, cooldown: 3, power: [14, 19], text: "大ダメージの必殺技" },
+      { id: "earth_bump", name: "だいちバンプ", requiredStage: 20, requiredFriendship: 9, comboGroup: "heavy", cost: 3, cooldown: 3, power: [16, 22], guard: 3, text: "攻防一体の重い一撃" },
+      { id: "friend_bloom", name: "なかよし開花", requiredStage: 28, requiredFriendship: 10, comboGroup: "special", cost: 4, cooldown: 4, power: [18, 24], heal: 4, text: "攻撃しながら回復" },
+      { id: "rainbow_turnip", name: "虹かぶアタック", requiredStage: 40, requiredFriendship: 15, comboGroup: "ultimate", cost: 4, cooldown: 5, power: [24, 32], heal: 6, text: "最終盤の切り札" }
     ]
   },
 

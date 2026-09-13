@@ -95,6 +95,7 @@ function renderImages() {
 }
 
 function getIconSrc(iconId) {
+  if (iconId === "custom_photo" && state.customKabuImage) return state.customKabuImage;
   const icons = {
     kabukun_01: GAME_CONFIG.images.kabukun,
     kabukun_02: GAME_CONFIG.images.foodIcon,
@@ -304,6 +305,7 @@ function choosePhoto(file) {
   const reader = new FileReader();
   reader.onload = () => {
     state.customKabuImage = reader.result;
+    if (!state.iconId || state.iconId === "kabukun_01") state.iconId = "custom_photo";
     persist();
     renderImages();
     showToast("写真を設定しました");
@@ -643,6 +645,8 @@ async function openProfile() {
   const nickname = profile?.nickname || state.nickname || "かぶくん";
   const iconId = profile?.iconId || state.iconId || "kabukun_01";
   const friendCount = profile?.friendCount ?? state.friends.length;
+  const iconOptions = ["kabukun_01", "kabukun_02", "kabukun_03"];
+  if (state.customKabuImage) iconOptions.unshift("custom_photo");
 
   openModal("プロフィール", `
     <section class="profile-panel">
@@ -657,11 +661,12 @@ async function openProfile() {
       </div>
       <input id="nicknameInput" class="gift-input" type="text" maxlength="12" value="${nickname}" placeholder="ニックネーム" />
       <div class="icon-options">
-        ${["kabukun_01", "kabukun_02", "kabukun_03"]
+        ${iconOptions
           .map(
             (id) => `
               <button class="icon-option ${id === iconId ? "is-selected" : ""}" data-icon-id="${id}">
                 <img src="${getIconSrc(id)}" alt="" />
+                ${id === "custom_photo" ? "<span>写真</span>" : ""}
               </button>`
           )
           .join("")}
@@ -775,15 +780,25 @@ function claimMission(missionId) {
 }
 
 function openBattle() {
+  const maxStage = GAME_CONFIG.battle.stageCount;
+  const currentStage = getCurrentBattleStage();
+  const stageButtons = Array.from({ length: maxStage }, (_, index) => index + 1)
+    .map((stage) => {
+      const unlocked = stage <= currentStage;
+      return `<button class="stage-chip ${stage === currentStage ? "is-current" : ""}" ${unlocked ? `data-battle-stage="${stage}"` : "disabled"}>${stage}</button>`;
+    })
+    .join("");
+
   openModal("かぶくんバトル", `
     <section class="battle-menu">
       <button class="battle-mode-card" data-action="start-solo-battle">
         <span class="battle-mode-icon">⚔️</span>
         <span>
-          <strong>ひとりでバトル</strong>
-          <small>技とエネルギーを選んで戦う</small>
+          <strong>ステージ ${currentStage}</strong>
+          <small>勝つと次のステージへ進みます</small>
         </span>
       </button>
+      <div class="stage-map">${stageButtons}</div>
       <button class="battle-mode-card is-disabled" disabled aria-disabled="true">
         <span class="battle-mode-icon">🌐</span>
         <span>
@@ -796,34 +811,66 @@ function openBattle() {
   `);
 }
 
-function startSoloBattle() {
+function getCurrentBattleStage() {
+  return Math.min(GAME_CONFIG.battle.stageCount, Math.max(1, Number(state.battleStage) || 1));
+}
+
+function getBattleStageInfo(stage) {
+  const level = Math.min(GAME_CONFIG.battle.stageCount, Math.max(1, Number(stage) || 1));
+  return {
+    level,
+    playerHp: GAME_CONFIG.battle.playerMaxHp + Math.floor(Number(state.friendship || 1) * 1.5) + Math.floor(level / 2),
+    rivalHp: GAME_CONFIG.battle.rivalMaxHp + Math.floor(level * 3.2),
+    rivalDamage: [6 + Math.floor(level / 8), 11 + Math.floor(level / 5)],
+    reward: GAME_CONFIG.battle.winRewardCoins + Math.floor(level * 1.8)
+  };
+}
+
+function getAvailableBattleSkills() {
+  return GAME_CONFIG.battle.skills.filter(
+    (skill) => Number(state.friendship || 1) >= (skill.requiredFriendship || 1) && getCurrentBattleStage() >= (skill.requiredStage || 1)
+  );
+}
+
+function startSoloBattle(stage = getCurrentBattleStage()) {
+  const targetStage = Math.min(getCurrentBattleStage(), Math.max(1, Number(stage) || 1));
+  const stageInfo = getBattleStageInfo(targetStage);
   battle = {
-    playerHp: GAME_CONFIG.battle.playerMaxHp,
-    rivalHp: GAME_CONFIG.battle.rivalMaxHp,
+    stage: targetStage,
+    playerMaxHp: stageInfo.playerHp,
+    rivalMaxHp: stageInfo.rivalHp,
+    rivalDamage: stageInfo.rivalDamage,
+    reward: stageInfo.reward,
+    playerHp: stageInfo.playerHp,
+    rivalHp: stageInfo.rivalHp,
     energy: 2,
     guard: 0,
     cooldowns: {},
     lastSkillId: "",
     lastComboGroup: "",
+    recentSkills: [],
     repeatPressure: 0,
     turn: 1,
-    log: "ライバルかぶがあらわれた！ 技を選ぼう。"
+    log: `ステージ${targetStage}のライバルかぶがあらわれた！`
   };
   renderBattle();
 }
 
 function renderBattle() {
   if (!battle) return;
-  const playerPercent = Math.max(0, (battle.playerHp / GAME_CONFIG.battle.playerMaxHp) * 100);
-  const rivalPercent = Math.max(0, (battle.rivalHp / GAME_CONFIG.battle.rivalMaxHp) * 100);
+  const playerPercent = Math.max(0, (battle.playerHp / battle.playerMaxHp) * 100);
+  const rivalPercent = Math.max(0, (battle.rivalHp / battle.rivalMaxHp) * 100);
   const skills = GAME_CONFIG.battle.skills
     .map(
       (skill) => {
-        const locked = Number(state.friendship || 1) < (skill.requiredFriendship || 1);
+        const lockedByFriendship = Number(state.friendship || 1) < (skill.requiredFriendship || 1);
+        const lockedByStage = getCurrentBattleStage() < (skill.requiredStage || 1);
+        const locked = lockedByFriendship || lockedByStage;
+        const lockText = lockedByStage ? `ステージ${skill.requiredStage}で解放` : `なかよし${skill.requiredFriendship}で解放`;
         return `
         <button class="skill-btn" data-battle-skill="${skill.id}" ${locked || battle.energy < skill.cost || battle.cooldowns[skill.id] > 0 ? "disabled" : ""}>
           <strong>${skill.name}</strong>
-          <small>${locked ? `なかよし${skill.requiredFriendship}で解放` : `${skill.text} / EN ${skill.cost}${battle.cooldowns[skill.id] > 0 ? ` / あと${battle.cooldowns[skill.id]}ターン` : ""}`}</small>
+          <small>${locked ? lockText : `${skill.text} / EN ${skill.cost}${battle.cooldowns[skill.id] > 0 ? ` / あと${battle.cooldowns[skill.id]}ターン` : ""}`}</small>
         </button>`;
       }
     )
@@ -831,19 +878,23 @@ function renderBattle() {
 
   openModal("ひとりでバトル", `
     <section class="battle-panel">
+      <div class="battle-stage-bar">
+        <strong>STAGE ${battle.stage}</strong>
+        <span>${battle.stage >= GAME_CONFIG.battle.stageCount ? "最終ステージ" : `次: ${battle.stage + 1}`}</span>
+      </div>
       <div class="battle-field">
         <div class="fighter">
           <img src="${state.customKabuImage || GAME_CONFIG.images.kabukun}" alt="かぶくん" />
           <strong>かぶくん</strong>
           <div class="hp-track"><span style="width: ${playerPercent}%"></span></div>
-          <small>HP ${battle.playerHp}/${GAME_CONFIG.battle.playerMaxHp}</small>
+          <small>HP ${battle.playerHp}/${battle.playerMaxHp}</small>
         </div>
         <div class="versus">EN ${battle.energy}</div>
         <div class="fighter rival">
           <img src="${GAME_CONFIG.images.kabukun}" alt="ライバルかぶ" />
-          <strong>ライバル</strong>
+          <strong>ライバル Lv.${battle.stage}</strong>
           <div class="hp-track"><span style="width: ${rivalPercent}%"></span></div>
-          <small>HP ${battle.rivalHp}/${GAME_CONFIG.battle.rivalMaxHp}</small>
+          <small>HP ${battle.rivalHp}/${battle.rivalMaxHp}</small>
         </div>
       </div>
       <p class="battle-log">${battle.log}</p>
@@ -856,8 +907,9 @@ function renderBattle() {
 function useBattleSkill(skillId) {
   if (!battle) return;
   const skill = GAME_CONFIG.battle.skills.find((item) => item.id === skillId);
-  const locked = Number(state.friendship || 1) < (skill?.requiredFriendship || 1);
-  if (!skill || battle.energy < skill.cost) {
+  if (!skill) return;
+  const locked = Number(state.friendship || 1) < (skill.requiredFriendship || 1) || getCurrentBattleStage() < (skill.requiredStage || 1);
+  if (battle.energy < skill.cost) {
     showToast("エネルギーが足りません");
     return;
   }
@@ -879,22 +931,29 @@ function useBattleSkill(skillId) {
   battle.lastSkillId = skill.id;
   battle.cooldowns[skill.id] = skill.cooldown || 1;
   const repeatedGroup = battle.lastComboGroup === skill.comboGroup;
-  battle.repeatPressure = repeatedGroup ? battle.repeatPressure + 1 : 0;
+  const alternatingPattern =
+    battle.recentSkills.length >= 3 &&
+    battle.recentSkills[battle.recentSkills.length - 1] !== skill.id &&
+    battle.recentSkills[battle.recentSkills.length - 2] === skill.id &&
+    battle.recentSkills[battle.recentSkills.length - 3] === battle.recentSkills[battle.recentSkills.length - 1];
+  battle.repeatPressure = repeatedGroup || alternatingPattern ? battle.repeatPressure + 1 : Math.max(0, battle.repeatPressure - 1);
   battle.lastComboGroup = skill.comboGroup;
+  battle.recentSkills.push(skill.id);
+  battle.recentSkills = battle.recentSkills.slice(-4);
   let log = `${skill.name}！`;
   if (skill.power) {
-    const pressurePenalty = Math.min(5, battle.repeatPressure * 3);
+    const pressurePenalty = Math.min(8, battle.repeatPressure * 3);
     const damage = Math.max(1, randomRange(skill.power[0], skill.power[1]) - pressurePenalty);
     battle.rivalHp = Math.max(0, battle.rivalHp - damage);
     log += ` ${damage}ダメージ`;
-    if (pressurePenalty > 0) log += " 似た技を読まれた";
+    if (pressurePenalty > 0) log += " 技の流れを読まれた";
   }
   if (skill.guard) {
     battle.guard = skill.guard;
     log += ` 守りを固めた`;
   }
   if (skill.heal) {
-    battle.playerHp = Math.min(GAME_CONFIG.battle.playerMaxHp, battle.playerHp + skill.heal);
+    battle.playerHp = Math.min(battle.playerMaxHp, battle.playerHp + skill.heal);
     log += ` HP+${skill.heal}`;
   }
   if (skill.energy) {
@@ -912,7 +971,7 @@ function useBattleSkill(skillId) {
 
 function rivalTurn() {
   const pressureBonus = battle.repeatPressure > 0 ? battle.repeatPressure * 2 : 0;
-  const damage = Math.max(1, randomRange(6, 11) + pressureBonus - battle.guard);
+  const damage = Math.max(1, randomRange(battle.rivalDamage[0], battle.rivalDamage[1]) + pressureBonus - battle.guard);
   battle.playerHp = Math.max(0, battle.playerHp - damage);
   battle.energy = Math.min(GAME_CONFIG.battle.maxEnergy, battle.energy + 1);
   Object.keys(battle.cooldowns).forEach((skillId) => {
@@ -928,19 +987,23 @@ function rivalTurn() {
 }
 
 function finishBattle(won) {
-  const reward = won ? GAME_CONFIG.battle.winRewardCoins : GAME_CONFIG.battle.loseRewardCoins;
+  const clearedStage = battle?.stage || getCurrentBattleStage();
+  const reward = won ? battle.reward : GAME_CONFIG.battle.loseRewardCoins;
   state.coins += reward;
   if (won) {
     state.battleWins += 1;
     state.daily.battleWins += 1;
+    if (clearedStage >= getCurrentBattleStage() && state.battleStage < GAME_CONFIG.battle.stageCount) {
+      state.battleStage = Math.min(GAME_CONFIG.battle.stageCount, clearedStage + 1);
+    }
   }
   persist();
   battle = null;
   openModal(won ? "勝利！" : "もう少し！", `
     <section class="result-panel">
       <div class="result-coin">🪙 ${reward}</div>
-      <p class="gift-note">${won ? "技を使いこなして勝ちました。" : "負けても少しだけコインを受け取りました。"}</p>
-      <button class="primary-btn" data-action="start-solo-battle">もう一度バトル</button>
+      <p class="gift-note">${won ? `ステージ${clearedStage}クリア！ ${clearedStage >= GAME_CONFIG.battle.stageCount ? "全ステージ制覇です。" : `ステージ${state.battleStage}へ進めます。`}` : "負けても少しだけコインを受け取りました。"}</p>
+      <button class="primary-btn" data-action="start-solo-battle">${won ? "次のステージへ" : "もう一度バトル"}</button>
       <button class="secondary-btn" data-action="open-battle">モード選択へ</button>
     </section>
   `);
@@ -1051,6 +1114,7 @@ function bindEvents() {
     const helpTask = event.target.closest("[data-help-task]");
     const approveButton = event.target.closest("[data-approve-friend]");
     const battleSkill = event.target.closest("[data-battle-skill]");
+    const battleStage = event.target.closest("[data-battle-stage]");
     const iconOption = event.target.closest("[data-icon-id]");
 
     if (routeButton) routeTo(routeButton.dataset.route);
@@ -1072,6 +1136,7 @@ function bindEvents() {
     if (claimButton) claimMission(claimButton.dataset.claimMission);
     if (helpTask) tapHelpTask(Number(helpTask.dataset.helpTask));
     if (approveButton) approveFriend(approveButton.dataset.approveFriend, approveButton.dataset.approveSource, approveButton.dataset.approveCode);
+    if (battleStage) startSoloBattle(Number(battleStage.dataset.battleStage));
     if (battleSkill) useBattleSkill(battleSkill.dataset.battleSkill);
     if (iconOption) {
       document.querySelectorAll(".icon-option").forEach((button) => button.classList.remove("is-selected"));

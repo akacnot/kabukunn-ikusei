@@ -255,6 +255,23 @@ button:active {
   font-weight: 900;
 }
 
+.hud-right {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.hud-photo-btn {
+  min-height: 30px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: var(--leaf-dark);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 5px 12px rgba(33, 72, 61, 0.12);
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .time-pill {
   min-width: 74px;
   height: 38px;
@@ -824,6 +841,59 @@ button:active {
   font-size: 30px;
 }
 
+.stage-map {
+  max-height: 142px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 7px;
+  padding: 4px 2px;
+}
+
+.stage-chip {
+  min-height: 34px;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--leaf-dark);
+  box-shadow: 0 5px 0 #dbe8d5;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.stage-chip.is-current {
+  color: #fff;
+  background: linear-gradient(180deg, #ff8aa3, #e9486f);
+  box-shadow: 0 5px 0 #b72f50;
+}
+
+.stage-chip:disabled {
+  opacity: 0.38;
+  box-shadow: none;
+  cursor: default;
+}
+
+.battle-stage-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(33, 72, 61, 0.08);
+}
+
+.battle-stage-bar strong {
+  color: #e9486f;
+  font-size: 15px;
+}
+
+.battle-stage-bar span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .battle-field {
   display: grid;
   grid-template-columns: 1fr 46px 1fr;
@@ -989,6 +1059,9 @@ button:active {
 
 .icon-option {
   min-height: 72px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
   border-radius: 16px;
   background: #fff;
   box-shadow: 0 6px 14px rgba(33, 72, 61, 0.08);
@@ -1002,6 +1075,12 @@ button:active {
   width: 54px;
   height: 54px;
   object-fit: contain;
+}
+
+.icon-option span {
+  color: var(--leaf-dark);
+  font-size: 11px;
+  font-weight: 900;
 }
 
 .help-tasks {

@@ -51,9 +51,12 @@
             <div class="time-pill" aria-label="現在の時刻">
               <span id="currentTime">--:--</span>
             </div>
-            <div class="coin-pill" aria-label="現在のコイン枚数">
-              <img class="coin-icon" data-ui-image="coinIcon" alt="" />
-              <span id="coinCount">0</span>
+            <div class="hud-right">
+              <div class="coin-pill" aria-label="現在のコイン枚数">
+                <img class="coin-icon" data-ui-image="coinIcon" alt="" />
+                <span id="coinCount">0</span>
+              </div>
+              <button id="photoButton" class="hud-photo-btn">写真</button>
             </div>
           </header>
 
@@ -82,7 +85,6 @@
               <button id="earnButton" class="earn-btn">おてつだい</button>
               <button id="friendButton" class="friend-btn">フレンド</button>
               <button id="profileButton" class="profile-btn">プロフィール</button>
-              <button id="photoButton" class="photo-btn">写真</button>
             </div>
             <input id="photoInput" class="visually-hidden" type="file" accept="image/*" />
           </section>

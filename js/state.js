@@ -27,6 +27,7 @@ const Store = {
     state.helpCoins = state.helpCoins || 0;
     state.helperPlays = state.helperPlays || 0;
     state.battleWins = state.battleWins || 0;
+    state.battleStage = Math.min(50, Math.max(1, Number(state.battleStage) || 1));
     state.daily = state.daily || {};
     state.dailyClaimedMissions = state.dailyClaimedMissions || {};
     syncDailyState(state);

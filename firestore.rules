@@ -20,6 +20,12 @@ service cloud.firestore {
       return signedIn() && redemptionId.matches('^[A-Z0-9_-]{3,32}_' + request.auth.uid + '$');
     }
 
+    function relatedFriendRequestId(requestId) {
+      return signedIn()
+        && (requestId.matches('^' + request.auth.uid + '_[A-Za-z0-9_-]+$')
+          || requestId.matches('^[A-Za-z0-9_-]+_' + request.auth.uid + '$'));
+    }
+
     function validProfileCreate(uid) {
       return isOwner(uid)
         && request.resource.data.keys().hasOnly(['uid', 'playerCode', 'nickname', 'iconId', 'coins', 'friendship', 'friends', 'migrationSource', 'migratedFromLocalAt', 'createdAt', 'updatedAt'])
@@ -82,7 +88,10 @@ service cloud.firestore {
     }
 
     match /friendRequests/{requestId} {
-      allow read: if signedIn()
+      allow get: if relatedFriendRequestId(requestId)
+        || (signedIn()
+          && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid));
+      allow list: if signedIn()
         && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
 
       allow create: if signedIn()
