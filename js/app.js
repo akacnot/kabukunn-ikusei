@@ -20,6 +20,7 @@ const els = {
   minigameButton: document.querySelector("#minigameButton"),
   friendButton: document.querySelector("#friendButton"),
   profileButton: document.querySelector("#profileButton"),
+  rankingButton: document.querySelector("#rankingButton"),
   photoButton: document.querySelector("#photoButton"),
   photoInput: document.querySelector("#photoInput"),
   kabukunButton: document.querySelector("#kabukunButton"),
@@ -742,6 +743,60 @@ async function saveProfile() {
   openProfile();
 }
 
+async function openRanking() {
+  openModal("ランキング", `
+    <section class="ranking-panel">
+      <p class="gift-note">ランキングを読み込んでいます...</p>
+    </section>
+  `);
+
+  if (!canUseFirebase()) {
+    openModal("ランキング", `
+      <section class="ranking-panel">
+        <p class="gift-note">Firebase接続後にランキングを表示できます。</p>
+      </section>
+    `);
+    return;
+  }
+
+  try {
+    const players = await FirebaseService.getLeaderboard(100);
+    const rows = players.length
+      ? players
+          .map(
+            (player) => `
+              <article class="ranking-row ${player.uid === FirebaseService.getCurrentUid() ? "is-me" : ""}">
+                <span class="ranking-rank">${player.rank}</span>
+                <img class="ranking-icon" src="${getProfileIconSrc(player)}" alt="" />
+                <div>
+                  <strong>${player.nickname || "かぶくん"}</strong>
+                  <small>${player.playerCode || player.code || ""}</small>
+                </div>
+                <span class="ranking-coins">🪙 ${Number(player.coins || 0).toLocaleString("ja-JP")}</span>
+              </article>`
+          )
+          .join("")
+      : `<p class="gift-note">ランキングに表示できるプレイヤーがまだいません。</p>`;
+
+    openModal("ランキング", `
+      <section class="ranking-panel">
+        <div class="ranking-summary">
+          <strong>コインランキング</strong>
+          <span>100位まで表示</span>
+        </div>
+        <div class="ranking-list">${rows}</div>
+      </section>
+    `);
+  } catch (error) {
+    console.error("[Firebase] ranking open failed in app", error);
+    openModal("ランキング", `
+      <section class="ranking-panel">
+        <p class="gift-note">ランキングを読み込めませんでした。Consoleを確認してください。</p>
+      </section>
+    `);
+  }
+}
+
 function openMissions() {
   openModal("ミッション", renderMissions());
 }
@@ -1199,6 +1254,7 @@ function bindEvents() {
   els.minigameButton.addEventListener("click", openMinigame);
   els.friendButton.addEventListener("click", openFriends);
   els.profileButton.addEventListener("click", openProfile);
+  els.rankingButton.addEventListener("click", openRanking);
   els.photoButton.addEventListener("click", () => els.photoInput.click());
   els.photoInput.addEventListener("change", (event) => choosePhoto(event.target.files[0]));
   els.kabukunButton.addEventListener("click", openFeedMenu);

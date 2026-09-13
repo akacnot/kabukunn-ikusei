@@ -11,7 +11,9 @@ import {
   getDoc,
   getDocs,
   getFirestore,
+  limit,
   onSnapshot,
+  orderBy,
   query,
   runTransaction,
   serverTimestamp,
@@ -153,6 +155,22 @@ export async function getFriendState() {
     };
   } catch (error) {
     console.error("[Firebase] friend state load failed", error);
+    throw error;
+  }
+}
+
+export async function getLeaderboard(maxCount = 100) {
+  if (!firebaseReady || !currentUser) return [];
+  try {
+    const leaderboardSnap = await getDocs(
+      query(collection(db, "users"), orderBy("coins", "desc"), limit(Math.min(100, Math.max(1, Number(maxCount) || 100))))
+    );
+    return leaderboardSnap.docs.map((item, index) => ({
+      rank: index + 1,
+      ...publicProfile(item.data())
+    }));
+  } catch (error) {
+    console.error("[Firebase] leaderboard load failed", error);
     throw error;
   }
 }

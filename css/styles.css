@@ -173,6 +173,7 @@ h1 {
 .earn-btn,
 .friend-btn,
 .profile-btn,
+.ranking-btn,
 .photo-btn,
 .buy-btn,
 .claim-btn,
@@ -468,6 +469,12 @@ button:active {
   color: #fff;
   background: linear-gradient(180deg, #ffd36a, #f3a92f);
   box-shadow: 0 6px 0 #bd791b;
+}
+
+.ranking-btn {
+  color: #fff;
+  background: linear-gradient(180deg, #7bd7ff, #3d9be8);
+  box-shadow: 0 6px 0 #2874b6;
 }
 
 .photo-btn {
@@ -1006,9 +1013,87 @@ button:active {
 }
 
 .help-panel,
-.friend-panel {
+.friend-panel,
+.ranking-panel {
   display: grid;
   gap: 12px;
+}
+
+.ranking-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #eef8ff;
+  color: #2874b6;
+  font-weight: 900;
+}
+
+.ranking-summary span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ranking-list {
+  max-height: min(58dvh, 520px);
+  overflow: auto;
+  display: grid;
+  gap: 8px;
+  padding-right: 2px;
+}
+
+.ranking-row {
+  display: grid;
+  grid-template-columns: 34px 44px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(33, 72, 61, 0.08);
+}
+
+.ranking-row.is-me {
+  outline: 3px solid rgba(247, 185, 52, 0.42);
+  background: #fff9e9;
+}
+
+.ranking-rank {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #f2f8ff;
+  color: #2874b6;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ranking-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  object-fit: cover;
+  background: #f4fff4;
+}
+
+.ranking-row strong,
+.ranking-row small {
+  display: block;
+}
+
+.ranking-row small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ranking-coins {
+  color: #ad6a13;
+  font-size: 13px;
+  font-weight: 900;
 }
 
 .profile-panel {
@@ -1341,6 +1426,7 @@ button:active {
   .earn-btn,
   .friend-btn,
   .profile-btn,
+  .ranking-btn,
   .photo-btn {
     min-height: 46px;
   }
