@@ -772,7 +772,7 @@ async function openRanking() {
                   <strong>${player.nickname || "かぶくん"}</strong>
                   <small>${player.playerCode || player.code || ""}</small>
                 </div>
-                <span class="ranking-coins">🪙 ${Number(player.coins || 0).toLocaleString("ja-JP")}</span>
+                <span class="ranking-coins">なかよし ${Number(player.friendship || 1).toLocaleString("ja-JP")}</span>
               </article>`
           )
           .join("")
@@ -781,7 +781,7 @@ async function openRanking() {
     openModal("ランキング", `
       <section class="ranking-panel">
         <div class="ranking-summary">
-          <strong>コインランキング</strong>
+          <strong>かぶくんランキング</strong>
           <span>100位まで表示</span>
         </div>
         <div class="ranking-list">${rows}</div>

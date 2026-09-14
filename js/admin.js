@@ -47,6 +47,7 @@ let auth = null;
 let db = null;
 let adminUser = null;
 let firebaseAdminReady = false;
+let renderTimer = 0;
 
 function loadGifts() {
   return JSON.parse(localStorage.getItem(ADMIN_STORAGE_KEY) || "{}");
@@ -54,7 +55,7 @@ function loadGifts() {
 
 function saveGifts(gifts) {
   localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(gifts));
-  render();
+  queueRender();
 }
 
 function loadMissions() {
@@ -63,7 +64,12 @@ function loadMissions() {
 
 function saveMissions(missions) {
   localStorage.setItem(ADMIN_MISSION_STORAGE_KEY, JSON.stringify(missions));
-  render();
+  queueRender();
+}
+
+function queueRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(() => render(), 0);
 }
 
 async function initFirebaseAdmin() {
@@ -82,7 +88,7 @@ async function initFirebaseAdmin() {
     firebaseAdminReady = adminSnap.exists() && adminSnap.data().role === "admin";
     els.firebaseStatus.textContent = firebaseAdminReady
       ? `Firebase連携中: admin (${adminUser.uid})`
-      : `Firebase接続済み: admin権限なし (${adminUser.uid})`;
+      : `ローカル保存のみ: Firebase保存には users/${adminUser.uid} に role: "admin" が必要`;
   } catch (error) {
     console.error("[Firebase] admin initialization failed", error);
     els.firebaseStatus.textContent = "Firebase接続エラー: Consoleを確認してください";
@@ -155,7 +161,10 @@ function renderMissions() {
 
 async function saveGift() {
   const code = els.giftCode.value.trim().toUpperCase();
-  if (!/^[A-Z0-9_-]{3,32}$/.test(code)) return;
+  if (!/^[A-Z0-9_-]{3,32}$/.test(code)) {
+    els.firebaseStatus.textContent = "コードは3〜32文字の英数字・_・-で入力してください";
+    return;
+  }
   const gift = {
     label: els.giftLabel.value.trim() || "運営配布",
     rewards: {
@@ -170,6 +179,7 @@ async function saveGift() {
   const gifts = loadGifts();
   gifts[code] = gift;
   localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(gifts));
+  els.firebaseStatus.textContent = `ローカル保存しました: ${code}`;
 
   if (firebaseAdminReady) {
     try {
@@ -184,11 +194,13 @@ async function saveGift() {
       console.error("[Firebase] promo code save failed", error);
       els.firebaseStatus.textContent = "Firebase保存に失敗: Consoleを確認してください";
     }
+  } else if (db && adminUser) {
+    els.firebaseStatus.textContent = `ローカル保存しました: Firebase保存には users/${adminUser.uid} に role: "admin" が必要`;
   }
 
   els.giftCode.value = "";
   els.giftLabel.value = "";
-  render();
+  queueRender();
 }
 
 function downloadJson() {
@@ -231,7 +243,7 @@ async function deleteGift(code) {
       console.error("[Firebase] promo code delete failed", error);
     }
   }
-  render();
+  queueRender();
 }
 
 document.addEventListener("click", (event) => {

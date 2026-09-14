@@ -163,7 +163,7 @@ export async function getLeaderboard(maxCount = 100) {
   if (!firebaseReady || !currentUser) return [];
   try {
     const leaderboardSnap = await getDocs(
-      query(collection(db, "users"), orderBy("coins", "desc"), limit(Math.min(100, Math.max(1, Number(maxCount) || 100))))
+      query(collection(db, "users"), orderBy("friendship", "desc"), limit(Math.min(100, Math.max(1, Number(maxCount) || 100))))
     );
     return leaderboardSnap.docs.map((item, index) => ({
       rank: index + 1,
