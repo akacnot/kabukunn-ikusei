@@ -118,6 +118,17 @@ async function loadFirebasePromoCodes() {
   }
 }
 
+async function loadFirebaseMissions() {
+  if (!firebaseAdminReady) return [];
+  try {
+    const snapshot = await getDocs(collection(db, "adminMissions"));
+    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+  } catch (error) {
+    console.error("[Firebase] mission load failed", error);
+    return [];
+  }
+}
+
 async function render() {
   const localGifts = loadGifts();
   const firebaseGifts = await loadFirebasePromoCodes();
@@ -138,11 +149,15 @@ async function render() {
         .join("")
     : "<p>保存中の配布コードはありません。</p>";
   els.jsonOutput.value = JSON.stringify(gifts, null, 2);
-  renderMissions();
+  await renderMissions();
 }
 
-function renderMissions() {
-  const missions = loadMissions();
+async function renderMissions() {
+  const localMissions = loadMissions();
+  const firebaseMissions = await loadFirebaseMissions();
+  const byId = new Map();
+  [...localMissions, ...firebaseMissions].forEach((mission) => byId.set(mission.id, mission));
+  const missions = [...byId.values()];
   els.missionList.innerHTML = missions.length
     ? missions
         .map(
@@ -150,7 +165,7 @@ function renderMissions() {
             <article class="gift-card">
               <div>
                 <strong>${mission.title}</strong>
-                <span>${mission.metric} / ${mission.target} / ${mission.reset === "daily" ? "毎日" : "一回だけ"} / コイン${mission.reward.coins || 0} / えさ${mission.reward.food || 0}</span>
+                <span>${mission.metric} / ${mission.target} / ${mission.reset === "daily" ? "毎日" : "一回だけ"} / コイン${mission.reward?.coins || 0} / えさ${mission.reward?.food || 0}${mission.enabled === false ? " / 停止中" : ""}</span>
               </div>
               <button data-delete-mission="${mission.id}" class="danger">削除</button>
             </article>`
@@ -213,10 +228,10 @@ function downloadJson() {
   URL.revokeObjectURL(url);
 }
 
-function saveMission() {
+async function saveMission() {
   const id = els.missionId.value.trim() || `admin_${Date.now()}`;
   const missions = loadMissions().filter((mission) => mission.id !== id);
-  missions.push({
+  const mission = {
     id,
     title: els.missionTitle.value.trim() || "運営ミッション",
     metric: els.missionMetric.value,
@@ -225,11 +240,33 @@ function saveMission() {
     reward: {
       coins: Number(els.missionCoins.value || 0),
       food: Number(els.missionFood.value || 0)
+    },
+    enabled: true
+  };
+  missions.push(mission);
+  localStorage.setItem(ADMIN_MISSION_STORAGE_KEY, JSON.stringify(missions));
+  els.firebaseStatus.textContent = `ミッションをローカル保存しました: ${id}`;
+
+  if (firebaseAdminReady) {
+    try {
+      await setDoc(doc(db, "adminMissions", id), {
+        ...mission,
+        createdBy: adminUser.uid,
+        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp()
+      });
+      els.firebaseStatus.textContent = `ミッションをFirebaseへ保存しました: ${id}`;
+    } catch (error) {
+      console.error("[Firebase] mission save failed", error);
+      els.firebaseStatus.textContent = "ミッションのFirebase保存に失敗: Consoleを確認してください";
     }
-  });
-  saveMissions(missions);
+  } else if (db && adminUser) {
+    els.firebaseStatus.textContent = `ミッションをローカル保存しました: Firebase保存には users/${adminUser.uid} に role: "admin" が必要`;
+  }
+
   els.missionId.value = "";
   els.missionTitle.value = "";
+  queueRender();
 }
 
 async function deleteGift(code) {
@@ -252,9 +289,26 @@ document.addEventListener("click", (event) => {
 
   const deleteMissionButton = event.target.closest("[data-delete-mission]");
   if (deleteMissionButton) {
-    saveMissions(loadMissions().filter((mission) => mission.id !== deleteMissionButton.dataset.deleteMission));
+    deleteMission(deleteMissionButton.dataset.deleteMission);
   }
 });
+
+async function deleteMission(id) {
+  localStorage.setItem(
+    ADMIN_MISSION_STORAGE_KEY,
+    JSON.stringify(loadMissions().filter((mission) => mission.id !== id))
+  );
+  if (firebaseAdminReady) {
+    try {
+      await deleteDoc(doc(db, "adminMissions", id));
+      els.firebaseStatus.textContent = `ミッションを削除しました: ${id}`;
+    } catch (error) {
+      console.error("[Firebase] mission delete failed", error);
+      els.firebaseStatus.textContent = "ミッションのFirebase削除に失敗: Consoleを確認してください";
+    }
+  }
+  queueRender();
+}
 
 els.saveGift.addEventListener("click", saveGift);
 els.saveMission.addEventListener("click", saveMission);

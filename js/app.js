@@ -40,6 +40,7 @@ let miniGame = null;
 let helpGame = null;
 let battle = null;
 let serverFriends = null;
+let firebaseMissions = [];
 let friendStateUnsubscribe = null;
 
 function canUseFirebase() {
@@ -797,7 +798,8 @@ async function openRanking() {
   }
 }
 
-function openMissions() {
+async function openMissions() {
+  await loadFirebaseMissions();
   openModal("ミッション", renderMissions());
 }
 
@@ -810,7 +812,33 @@ function getMissionProgress(mission) {
 
 function getAllMissions() {
   const adminMissions = JSON.parse(localStorage.getItem("kabukun-admin-missions") || "[]");
-  return [...GAME_CONFIG.missions, ...adminMissions];
+  const byId = new Map();
+  [...GAME_CONFIG.missions, ...adminMissions, ...firebaseMissions].forEach((mission) => {
+    if (mission?.id) byId.set(mission.id, normalizeMission(mission));
+  });
+  return [...byId.values()];
+}
+
+function normalizeMission(mission) {
+  return {
+    ...mission,
+    target: Math.max(1, Number(mission.target || 1)),
+    reward: {
+      coins: Number(mission.reward?.coins || 0),
+      food: Number(mission.reward?.food || 0)
+    },
+    reset: mission.reset === "once" ? "once" : "daily"
+  };
+}
+
+async function loadFirebaseMissions() {
+  if (!canUseFirebase()) return;
+  try {
+    firebaseMissions = await FirebaseService.getAdminMissions();
+    renderMissionNotice();
+  } catch (error) {
+    console.error("[Firebase] missions load failed in app", error);
+  }
 }
 
 function getClaimedMissions(mission) {
@@ -1278,6 +1306,7 @@ async function init() {
       Store.save(state);
       renderHud();
       startFriendRealtime();
+      loadFirebaseMissions();
     }
   } catch (error) {
     console.error("[Firebase] app initialization failed", error);

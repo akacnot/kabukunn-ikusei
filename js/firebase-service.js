@@ -175,6 +175,19 @@ export async function getLeaderboard(maxCount = 100) {
   }
 }
 
+export async function getAdminMissions() {
+  if (!firebaseReady || !currentUser) return [];
+  try {
+    const missionsSnap = await getDocs(query(collection(db, "adminMissions"), orderBy("createdAt", "desc")));
+    return missionsSnap.docs
+      .map((item) => ({ id: item.id, ...item.data() }))
+      .filter((mission) => mission.enabled !== false);
+  } catch (error) {
+    console.error("[Firebase] admin missions load failed", error);
+    throw error;
+  }
+}
+
 export function listenFriendState(onChange) {
   if (!firebaseReady || !currentUser) return () => {};
 
