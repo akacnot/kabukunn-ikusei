@@ -17,6 +17,7 @@ import {
 
 const ADMIN_STORAGE_KEY = "kabukun-admin-gifts";
 const ADMIN_MISSION_STORAGE_KEY = "kabukun-admin-missions";
+const ADMIN_NOTICE_STORAGE_KEY = "kabukun-admin-notices";
 
 const els = {
   giftCode: document.querySelector("#giftCode"),
@@ -39,7 +40,12 @@ const els = {
   missionFood: document.querySelector("#missionFood"),
   missionReset: document.querySelector("#missionReset"),
   saveMission: document.querySelector("#saveMission"),
-  missionList: document.querySelector("#missionList")
+  missionList: document.querySelector("#missionList"),
+  noticeId: document.querySelector("#noticeId"),
+  noticeTitle: document.querySelector("#noticeTitle"),
+  noticeBody: document.querySelector("#noticeBody"),
+  saveNotice: document.querySelector("#saveNotice"),
+  noticeList: document.querySelector("#noticeList")
 };
 
 let app = null;
@@ -65,6 +71,10 @@ function loadMissions() {
 function saveMissions(missions) {
   localStorage.setItem(ADMIN_MISSION_STORAGE_KEY, JSON.stringify(missions));
   queueRender();
+}
+
+function loadNotices() {
+  return JSON.parse(localStorage.getItem(ADMIN_NOTICE_STORAGE_KEY) || "[]");
 }
 
 function queueRender() {
@@ -129,6 +139,17 @@ async function loadFirebaseMissions() {
   }
 }
 
+async function loadFirebaseNotices() {
+  if (!firebaseAdminReady) return [];
+  try {
+    const snapshot = await getDocs(collection(db, "adminNotices"));
+    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+  } catch (error) {
+    console.error("[Firebase] notice load failed", error);
+    return [];
+  }
+}
+
 async function render() {
   const localGifts = loadGifts();
   const firebaseGifts = await loadFirebasePromoCodes();
@@ -150,6 +171,7 @@ async function render() {
     : "<p>保存中の配布コードはありません。</p>";
   els.jsonOutput.value = JSON.stringify(gifts, null, 2);
   await renderMissions();
+  await renderNotices();
 }
 
 async function renderMissions() {
@@ -172,6 +194,28 @@ async function renderMissions() {
         )
         .join("")
     : "<p>保存中のミッションはありません。</p>";
+}
+
+async function renderNotices() {
+  const localNotices = loadNotices();
+  const firebaseNotices = await loadFirebaseNotices();
+  const byId = new Map();
+  [...localNotices, ...firebaseNotices].forEach((notice) => byId.set(notice.id, notice));
+  const notices = [...byId.values()];
+  els.noticeList.innerHTML = notices.length
+    ? notices
+        .map(
+          (notice) => `
+            <article class="gift-card">
+              <div>
+                <strong>${notice.title || "お知らせ"}</strong>
+                <span>${notice.id} / ${notice.enabled === false ? "停止中" : "公開中"}</span>
+              </div>
+              <button data-delete-notice="${notice.id}" class="danger">削除</button>
+            </article>`
+        )
+        .join("")
+    : "<p>保存中のお知らせはありません。</p>";
 }
 
 async function saveGift() {
@@ -269,6 +313,47 @@ async function saveMission() {
   queueRender();
 }
 
+async function saveNotice() {
+  const id = els.noticeId.value.trim() || `notice_${Date.now()}`;
+  if (!/^[A-Za-z0-9_-]{3,48}$/.test(id)) {
+    els.firebaseStatus.textContent = "お知らせIDは3〜48文字の英数字・_・-で入力してください";
+    return;
+  }
+
+  const notice = {
+    id,
+    title: els.noticeTitle.value.trim() || "運営からのお知らせ",
+    body: els.noticeBody.value.trim() || "お知らせ本文を入力してください。",
+    enabled: true
+  };
+  const notices = loadNotices().filter((item) => item.id !== id);
+  notices.push(notice);
+  localStorage.setItem(ADMIN_NOTICE_STORAGE_KEY, JSON.stringify(notices));
+  els.firebaseStatus.textContent = `お知らせをローカル保存しました: ${id}`;
+
+  if (firebaseAdminReady) {
+    try {
+      await setDoc(doc(db, "adminNotices", id), {
+        ...notice,
+        createdBy: adminUser.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      els.firebaseStatus.textContent = `お知らせをFirebaseへ保存しました: ${id}`;
+    } catch (error) {
+      console.error("[Firebase] notice save failed", error);
+      els.firebaseStatus.textContent = "お知らせのFirebase保存に失敗: Consoleを確認してください";
+    }
+  } else if (db && adminUser) {
+    els.firebaseStatus.textContent = `お知らせをローカル保存しました: Firebase保存には users/${adminUser.uid} に role: "admin" が必要`;
+  }
+
+  els.noticeId.value = "";
+  els.noticeTitle.value = "";
+  els.noticeBody.value = "";
+  queueRender();
+}
+
 async function deleteGift(code) {
   const gifts = loadGifts();
   delete gifts[code];
@@ -291,6 +376,9 @@ document.addEventListener("click", (event) => {
   if (deleteMissionButton) {
     deleteMission(deleteMissionButton.dataset.deleteMission);
   }
+
+  const deleteNoticeButton = event.target.closest("[data-delete-notice]");
+  if (deleteNoticeButton) deleteNotice(deleteNoticeButton.dataset.deleteNotice);
 });
 
 async function deleteMission(id) {
@@ -310,8 +398,26 @@ async function deleteMission(id) {
   queueRender();
 }
 
+async function deleteNotice(id) {
+  localStorage.setItem(
+    ADMIN_NOTICE_STORAGE_KEY,
+    JSON.stringify(loadNotices().filter((notice) => notice.id !== id))
+  );
+  if (firebaseAdminReady) {
+    try {
+      await deleteDoc(doc(db, "adminNotices", id));
+      els.firebaseStatus.textContent = `お知らせを削除しました: ${id}`;
+    } catch (error) {
+      console.error("[Firebase] notice delete failed", error);
+      els.firebaseStatus.textContent = "お知らせのFirebase削除に失敗: Consoleを確認してください";
+    }
+  }
+  queueRender();
+}
+
 els.saveGift.addEventListener("click", saveGift);
 els.saveMission.addEventListener("click", saveMission);
+els.saveNotice.addEventListener("click", saveNotice);
 els.copyJson.addEventListener("click", () => navigator.clipboard?.writeText(els.jsonOutput.value));
 els.downloadJson.addEventListener("click", downloadJson);
 els.clearGifts.addEventListener("click", () => saveGifts({}));

@@ -188,6 +188,21 @@ export async function getAdminMissions() {
   }
 }
 
+export async function getAdminNotices(maxCount = 20) {
+  if (!firebaseReady || !currentUser) return [];
+  try {
+    const noticesSnap = await getDocs(
+      query(collection(db, "adminNotices"), orderBy("createdAt", "desc"), limit(Math.min(50, Math.max(1, Number(maxCount) || 20))))
+    );
+    return noticesSnap.docs
+      .map((item) => ({ id: item.id, ...item.data() }))
+      .filter((notice) => notice.enabled !== false);
+  } catch (error) {
+    console.error("[Firebase] admin notices load failed", error);
+    throw error;
+  }
+}
+
 export function listenFriendState(onChange) {
   if (!firebaseReady || !currentUser) return () => {};
 

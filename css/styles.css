@@ -1096,6 +1096,34 @@ button:active {
   font-weight: 900;
 }
 
+.notice-panel,
+.policy-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.notice-card {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(33, 72, 61, 0.08);
+}
+
+.notice-card strong {
+  color: var(--leaf-dark);
+  font-size: 15px;
+}
+
+.notice-card p {
+  white-space: pre-wrap;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.6;
+}
+
 .profile-panel {
   display: grid;
   gap: 12px;

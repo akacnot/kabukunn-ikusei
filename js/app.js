@@ -798,6 +798,63 @@ async function openRanking() {
   }
 }
 
+async function openNotices() {
+  openModal("お知らせ", `
+    <section class="notice-panel">
+      <p class="gift-note">お知らせを読み込んでいます...</p>
+    </section>
+  `);
+
+  if (!canUseFirebase()) {
+    openModal("お知らせ", `
+      <section class="notice-panel">
+        <p class="gift-note">Firebase接続後に運営からのお知らせを表示できます。</p>
+      </section>
+    `);
+    return;
+  }
+
+  try {
+    const notices = await FirebaseService.getAdminNotices(20);
+    const list = notices.length
+      ? notices
+          .map(
+            (notice) => `
+              <article class="notice-card">
+                <strong>${notice.title || "お知らせ"}</strong>
+                <p>${notice.body || ""}</p>
+              </article>`
+          )
+          .join("")
+      : `<p class="gift-note">現在のお知らせはありません。</p>`;
+
+    openModal("お知らせ", `<section class="notice-panel">${list}</section>`);
+  } catch (error) {
+    console.error("[Firebase] notices open failed in app", error);
+    openModal("お知らせ", `
+      <section class="notice-panel">
+        <p class="gift-note">お知らせを読み込めませんでした。Consoleを確認してください。</p>
+      </section>
+    `);
+  }
+}
+
+function openPolicies() {
+  openModal("利用規約・プライバシーポリシー", `
+    <section class="policy-panel">
+      <article class="notice-card">
+        <strong>利用規約</strong>
+        <p>このゲームは「かぶくん育成ゲーム」を楽しむためのサービスです。データ保存やランキング、フレンド機能のためにFirebaseを利用します。不正な操作や他のユーザーに迷惑をかける行為は禁止です。</p>
+      </article>
+      <article class="notice-card">
+        <strong>プライバシーポリシー</strong>
+        <p>匿名認証のUID、ニックネーム、アイコン、コイン、なかよし度、フレンド情報などを保存します。プロフィール写真を設定した場合は、表示用に小さくした画像データを保存します。</p>
+      </article>
+      <p class="gift-note">正式版の文章は今後更新できます。</p>
+    </section>
+  `);
+}
+
 async function openMissions() {
   await loadFirebaseMissions();
   openModal("ミッション", renderMissions());
@@ -1249,6 +1306,8 @@ function bindEvents() {
     if (modalButton?.dataset.modal === "shop") openShop();
     if (modalButton?.dataset.modal === "missions") openMissions();
     if (actionButton?.dataset.action === "show-preparing") showToast("準備中です");
+    if (actionButton?.dataset.action === "open-notices") openNotices();
+    if (actionButton?.dataset.action === "open-policies") openPolicies();
     if (actionButton?.dataset.action === "redeem-gift") redeemGift();
     if (actionButton?.dataset.action === "start-minigame") startMinigame();
     if (actionButton?.dataset.action === "open-minigame") openMinigame();

@@ -1,5 +1,5 @@
 window.GAME_CONFIG = {
-  appVersion: "1.20",
+  appVersion: "1.30",
 
   initialState: {
     coins: 120,

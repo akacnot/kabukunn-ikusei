@@ -104,6 +104,30 @@
         <h2>保存中のミッション</h2>
         <div id="missionList" class="gift-list"></div>
       </section>
+
+      <section class="admin-panel">
+        <h2>お知らせ作成</h2>
+        <div class="form-grid">
+          <label>
+            お知らせID
+            <input id="noticeId" type="text" placeholder="例: update_130" />
+          </label>
+          <label>
+            タイトル
+            <input id="noticeTitle" type="text" placeholder="例: Ver.1.30のお知らせ" />
+          </label>
+        </div>
+        <label>
+          本文
+          <textarea id="noticeBody" placeholder="プレイヤーに表示する内容"></textarea>
+        </label>
+        <button id="saveNotice" class="primary-admin">お知らせを保存</button>
+      </section>
+
+      <section class="admin-panel">
+        <h2>保存中のお知らせ</h2>
+        <div id="noticeList" class="gift-list"></div>
+      </section>
     </main>
 
     <script src="./js/firebase-config.js"></script>
